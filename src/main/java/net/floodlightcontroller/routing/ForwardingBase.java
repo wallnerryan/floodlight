@@ -18,6 +18,7 @@
 package net.floodlightcontroller.routing;
 
 import java.io.IOException;
+import java.util.EnumSet;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -28,6 +29,9 @@ import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFMessageListener;
 import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.annotations.LogMessageCategory;
+import net.floodlightcontroller.core.annotations.LogMessageDoc;
+import net.floodlightcontroller.core.annotations.LogMessageDocs;
 import net.floodlightcontroller.core.util.AppCookie;
 import net.floodlightcontroller.counter.ICounterStoreService;
 import net.floodlightcontroller.devicemanager.IDevice;
@@ -41,6 +45,7 @@ import net.floodlightcontroller.routing.IRoutingDecision;
 import net.floodlightcontroller.routing.Route;
 import net.floodlightcontroller.topology.ITopologyService;
 import net.floodlightcontroller.topology.NodePortTuple;
+import net.floodlightcontroller.util.OFMessageDamper;
 import net.floodlightcontroller.util.TimedCache;
 
 import org.openflow.protocol.OFFlowMod;
@@ -54,12 +59,21 @@ import org.openflow.protocol.action.OFActionOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Abstract base class for implementing a forwarding module.  Forwarding is
+ * responsible for programming flows to a switch in response to a policy
+ * decision.
+ */
+@LogMessageCategory("Flow Programming")
 public abstract class ForwardingBase 
 	implements IOFMessageListener, IDeviceListener {
     
 	protected static Logger log =
             LoggerFactory.getLogger(ForwardingBase.class);
-
+	
+    protected static int OFMESSAGE_DAMPER_CAPACITY = 50000; // TODO: find sweet spot
+    protected static int OFMESSAGE_DAMPER_TIMEOUT = 250; // ms 
+	
     public static short FLOWMOD_DEFAULT_IDLE_TIMEOUT = 5; // in seconds
     public static short FLOWMOD_DEFAULT_HARD_TIMEOUT = 0; // infinite
     
@@ -68,6 +82,8 @@ public abstract class ForwardingBase
     protected IRoutingService routingEngine;
     protected ITopologyService topology;
     protected ICounterStoreService counterStore;
+    
+    protected OFMessageDamper messageDamper;
     
     // for broadcast loop suppression
     protected boolean broadcastCacheFeature = true;
@@ -93,6 +109,16 @@ public abstract class ForwardingBase
                     return d1ClusterId.compareTo(d2ClusterId);
                 }
             };
+            
+    /**
+     * init data structures
+     * 
+     */
+    protected void init() {
+        messageDamper = new OFMessageDamper(OFMESSAGE_DAMPER_CAPACITY, 
+                                            EnumSet.of(OFType.FLOW_MOD),
+                                            OFMESSAGE_DAMPER_TIMEOUT);
+    }
 
     /**
      * Adds a listener for devicemanager and registers for PacketIns.
@@ -144,9 +170,6 @@ public abstract class ForwardingBase
             default:
             	break;
         }
-        log.error("received an unexpected message {} from switch {}",
-                  msg,
-                  sw);
         return Command.CONTINUE;
     }
 
@@ -166,6 +189,18 @@ public abstract class ForwardingBase
      *        OFFlowMod.OFPFC_MODIFY etc.
      * @return srcSwitchIincluded True if the source switch is included in this route
      */
+    @LogMessageDocs({
+        @LogMessageDoc(level="WARN",
+            message="Unable to push route, switch at DPID {dpid} not available",
+            explanation="A switch along the calculated path for the " +
+            		"flow has disconnected.",
+            recommendation=LogMessageDoc.CHECK_SWITCH),
+        @LogMessageDoc(level="ERROR",
+            message="Failure writing flow mod",
+            explanation="An I/O error occurred while writing a " +
+            		"flow modification to a switch",
+            recommendation=LogMessageDoc.CHECK_SWITCH),            
+    })
     public boolean pushRoute(Route route, OFMatch match, 
                              Integer wildcard_hints,
                              OFPacketIn pi,
@@ -239,7 +274,7 @@ public abstract class ForwardingBase
                                           fm.getMatch().getInputPort(),
                                           outPort });
                 }
-                sw.write(fm, cntx);
+                messageDamper.write(sw, fm, cntx);
                 if (doFlush) {
                     sw.flush();
                 }
@@ -285,6 +320,20 @@ public abstract class ForwardingBase
      * @param outPort   output port
      * @param cntx      context of the packet
      */
+    @LogMessageDocs({
+        @LogMessageDoc(level="ERROR",
+            message="BufferId is not and packet data is null. " +
+                    "Cannot send packetOut. " +
+                    "srcSwitch={dpid} inPort={port} outPort={port}",
+            explanation="The switch send a malformed packet-in." +
+            		"The packet will be dropped",
+            recommendation=LogMessageDoc.REPORT_SWITCH_BUG),
+        @LogMessageDoc(level="ERROR",
+            message="Failure writing packet out",
+            explanation="An I/O error occurred while writing a " +
+                    "packet out to a switch",
+            recommendation=LogMessageDoc.CHECK_SWITCH),            
+    })
     public void pushPacket(IPacket packet, 
                            IOFSwitch sw,
                            int bufferId,
@@ -318,7 +367,7 @@ public abstract class ForwardingBase
         // set data - only if buffer_id == -1
         if (po.getBufferId() == OFPacketOut.BUFFER_ID_NONE) {
             if (packet == null) {
-                log.error("BufferId is set but no packet data is null. " +
+                log.error("BufferId is not set and packet data is null. " +
                 		"Cannot send packetOut. " +
                         "srcSwitch={} inPort={} outPort={}",
                         new Object[] {sw, inPort, outPort});
@@ -333,7 +382,7 @@ public abstract class ForwardingBase
 
         try {
             counterStore.updatePktOutFMCounterStore(sw, po);
-            sw.write(po, cntx);
+            messageDamper.write(sw, po, cntx);
         } catch (IOException e) {
             log.error("Failure writing packet out", e);
         }
@@ -352,11 +401,15 @@ public abstract class ForwardingBase
      */
     protected void pushPacket(IOFSwitch sw, OFMatch match, OFPacketIn pi, 
                            short outport, FloodlightContext cntx) {
-        
+
         if (pi == null) {
             return;
+        } else if (pi.getInPort() == outport){
+            log.warn("Packet out not sent as the outport matches inport. {}",
+                     pi);
+            return;
         }
-        
+
         // The assumption here is (sw) is the switch that generated the 
         // packet-in. If the input port is the same as output port, then
         // the packet-out should be ignored.
@@ -369,7 +422,7 @@ public abstract class ForwardingBase
                 return;
             }
         }
-        
+
         if (log.isTraceEnabled()) {
             log.trace("PacketOut srcSwitch={} match={} pi={}", 
                       new Object[] {sw, match, pi});
@@ -412,7 +465,7 @@ public abstract class ForwardingBase
 
         try {
             counterStore.updatePktOutFMCounterStore(sw, po);
-            sw.write(po, cntx);
+            messageDamper.write(sw, po, cntx);
         } catch (IOException e) {
             log.error("Failure writing packet out", e);
         }
@@ -469,7 +522,7 @@ public abstract class ForwardingBase
                         "interfaces={} packet-out={}",
                         new Object[] {sw.getId(), outPorts, po});
             }
-            sw.write(po, cntx);
+            messageDamper.write(sw, po, cntx);
 
         } catch (IOException e) {
             log.error("Failure writing packet out", e);
@@ -542,6 +595,13 @@ public abstract class ForwardingBase
         return sw.updateBroadcastCache(hash, pi.getInPort());
     }
 
+    @LogMessageDocs({
+        @LogMessageDoc(level="ERROR",
+            message="Failure writing deny flow mod",
+            explanation="An I/O error occurred while writing a " +
+                    "deny flow mod to a switch",
+            recommendation=LogMessageDoc.CHECK_SWITCH),            
+    })
     public static boolean
             blockHost(IFloodlightProviderService floodlightProvider,
                       SwitchPort sw_tup, long host_mac,
@@ -581,6 +641,7 @@ public abstract class ForwardingBase
         try {
             log.debug("write drop flow-mod sw={} match={} flow-mod={}",
                       new Object[] { sw, match, fm });
+            // TODO: can't use the message damper sine this method is static
             sw.write(fm, null);
         } catch (IOException e) {
             log.error("Failure writing deny flow mod", e);

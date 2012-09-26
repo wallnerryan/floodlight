@@ -22,3 +22,5 @@ net.floodlightcontroller.devicemanager.internal.DefaultEntityClassifier
 net.floodlightcontroller.devicemanager.test.MockDeviceManager
 net.floodlightcontroller.core.test.MockFloodlightProvider
 net.floodlightcontroller.core.test.MockThreadPoolService
+net.floodlightcontroller.mactracker.MACTracker
+net.floodlightcontroller.qos.QoSTool

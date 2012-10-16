@@ -25,9 +25,7 @@ public class FirewallResource extends ServerResource {
         if (op.equalsIgnoreCase("enable")) {
             firewall.enableFirewall(true);
             return "{\"status\" : \"success\", \"details\" : \"firewall running\"}";
-        } else if (op.equalsIgnoreCase("status")) {
-            return firewall.isEnabled();
-        }else if (op.equalsIgnoreCase("disable")) {
+        } else if (op.equalsIgnoreCase("disable")) {
             firewall.enableFirewall(false);
             return "{\"status\" : \"success\", \"details\" : \"firewall stopped\"}";
         } else if (op.equalsIgnoreCase("storageRules")) {
@@ -36,6 +34,7 @@ public class FirewallResource extends ServerResource {
             return firewall.getSubnetMask();
         }
 
+        // no known options found
         return "{\"status\" : \"failure\", \"details\" : \"invalid operation\"}";
     }
     

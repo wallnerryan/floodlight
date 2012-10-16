@@ -267,6 +267,11 @@ public class Firewall implements IFirewallService, IOFMessageListener, IFloodlig
         logger.info("Setting firewall to {}", enabled);
         this.enabled = enabled;
     }
+    
+    @Override
+    public boolean isEnabled(){
+    	return this.enabled;
+    }
 
     @Override
     public List<FirewallRule> getRules() {

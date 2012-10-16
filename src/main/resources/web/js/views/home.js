@@ -17,7 +17,7 @@
 window.HomeView = Backbone.View.extend({
 
     initialize:function () {
-        // console.log('Initializing Home View');
+        // console.log('...Initializing Home Page');
         this.template = _.template(tpl.get('home'));
     },
 

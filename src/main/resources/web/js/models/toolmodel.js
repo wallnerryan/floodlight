@@ -1,5 +1,5 @@
 /*
-   Copyright 2012 IBM
+   Copyright 2012 IBM & Marist College 2012
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ window.Tool = Backbone.Model.extend({
         toolVersion: 1.0,
         toolId: null,
         restURI: null,
+        desc: "",
         enabled: false,
-        description: '',
     },
 
 });
@@ -34,6 +34,7 @@ window.ToolCollection = Backbone.Collection.extend({
     initialize:function () {
         // console.log('...Initializing Tools');
       	var self = this;
+      	self.bind("change");
       	
       	var tools = [];
       	console.log("fetching controller status");
@@ -52,42 +53,48 @@ window.ToolCollection = Backbone.Collection.extend({
       				var ntools = tools.length;
       				var count = 0;
       				_.each(tools, function(tool) {
-      				   count = count+1;
-      				    switch(tool.name){
+      				
+      					//Loop through each toolname and set parameters for webui
+      				    count = count+1;
+      				    switch(tool.name.toLowerCase()){
       				    
       				   		case 'firewall':
       				   		
-      				   			/////////////
-      				   		
+      				   			///////////////////////////////////////
       				   			t = "Firewall";
       				   			uri="/wm/firewall/";
-      				   			desc="A firewall based application";
+      				   			desc = "Stateless firewall implemented as a \
+      				   					Google Summer of Code project. \
+      				   					Configuration done through REST API";
       				   			break;
-      				   			
-      				   			/////////////	
+      				   			///////////////////////////////////////
       				   		
       				   		case 'qos':
       				   			
-      				   			/////////////
-      				   		
+      				   			///////////////////////////////////////
       				   			t = "Quality of Service";
       				   			uri="/wm/qos/";
-      				   			desc="A Quality of Service based application, providing DiffServ/ToS and Queue bases QoS";
-      				   			is_enabled = tools.isenabled;    				   			
+      				   			desc = "A Quality of Service Module that allows \
+      				   					Quality of Service state to be pushed into the \
+      				   					network through REST API's. The QoS follows \
+      				   					queuing QoS for max-min rate limits and a DiffServ \
+      				   					model Type of Service model. Allows for users to \
+      				   					define a QoS rule to be a queuing policy or a \
+      				   					type of service/ diffserv policy. \
+      				   					Configuration done through REST API";
       				   			break;
-      				   			
-      				   			/////////////
+      				   			///////////////////////////////////////
       				   			
       				   		default:
-      				   			t = "none";
-      				   		console.log("Module Not Recognized");
+      				   			 t = "donotadd";
+      				   			console.log("Module: "+tool.name+" Not Recognized");
       				   }
-      				   if (t != "none"){
+      				   if (t != "donotadd"){
+      				   
       				    //get the status of the tool
-      				    //***************************
       				    enabled = getStatus(tool.name);
-      				    //***************************
-          				self.add({toolName: t, toolId: count, restURI: uri, description: desc, enabled: enabled, id: count});
+      				    //add to the model
+          				self.add({toolName: t, toolId: count, restURI: uri, desc: desc, enabled: enabled, id: count});
           			   }
                      });
                  }
@@ -108,7 +115,7 @@ function getStatus(toolName){
             async: false, //need this for synchronization 
             success:function (data) {
             	status = data;
-            	console.log(status);
+            	//console.log(status);
             }
           });
         }

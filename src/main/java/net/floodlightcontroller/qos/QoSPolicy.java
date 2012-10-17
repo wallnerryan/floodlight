@@ -4,14 +4,62 @@ import net.floodlightcontroller.qos.QoSPolicy;
 
 public class QoSPolicy implements Comparable<QoSPolicy>{
 	
-	//TODO create params
+	//create params
+	public long policyid;
+	public String name;
+	public byte protocol;
+	public short ingressport;
+	public long ipdst;
+	public long ipsrc;
+	public short vlanid;
+	public long ethsrc;
+	public long ethdst;
+	public short tcpudpsrcport;
+	public short tcpudpdstport;
 	
-	public int priority;
+	//If it is queuing, must ignore ToS bits. and set "enqueue".
+	public boolean is_queuing;
+	public short queueid;
+	
+	//default type of service to best effort
+	public byte nw_tos = 0x00;
+	
+	//Defaulted Priority
+	public int priority = 0;
 
 	
 	public QoSPolicy(){
-		//TODO create this.param = value
+		this.policyid = 0;
+		this.name = null;
+		this.protocol = 0x00;
+		this.ingressport = 0;
+		this.ipdst = 0;
+		this.ipsrc = 0;
+		this.vlanid = -1;
+		this.ethsrc = 0;
+		this.ethdst = 0;
+		this.tcpudpdstport = 0;
+		this.tcpudpsrcport = 0;
+		this.is_queuing = false;
+		this.queueid = -1;
+		this.nw_tos = 0x00;
+		this.priority = 0;
+		
 	}
+	
+	/**
+     * Generates a unique ID for the instance
+     * 
+     * @return int representing the unique id
+     */
+    public int genID() {
+        int uid = this.hashCode();
+        if (uid < 0) {
+            uid = Math.abs(uid);
+            uid = uid * 15551;
+        }
+        return uid;
+    }
 	
 	/**
      * Comparison method for Collections.sort method

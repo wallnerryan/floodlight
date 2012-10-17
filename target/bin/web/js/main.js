@@ -19,7 +19,7 @@ var hackBase = ""; // put a URL here to access a different REST server
 var AppRouter = Backbone.Router.extend({
 
     routes:{
-        "/":"home",
+        "":"home",
         "topology":"topology",
         "switches":"switchList",
         "switch/:id":"switchDetails",
@@ -96,9 +96,6 @@ var AppRouter = Backbone.Router.extend({
 
     toolDetails:function (id) {
     var t = tl.get(id);
-    //console.log(t);
-    //console.log(id);
-    //console.log(tl);
     //console.log("switching to single tool view");
     $('#content').html(new ToolDetailsView({model:t}).render().el);
     $('ul.nav > li').removeClass('active');
@@ -138,6 +135,7 @@ tpl.loadTemplates(['home', 'status', 'topology', 'header', 'switch', 'switch-lis
 
         });
     });
+
 
 setInterval(function () {
     swl.fetch();

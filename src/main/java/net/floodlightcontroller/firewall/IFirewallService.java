@@ -17,8 +17,6 @@ public interface IFirewallService extends IFloodlightService {
      * Checked the enabledness
      * @param boolean.
      */
-    public boolean isEnabled();
-
     /**
      * Returns operational status of the firewall
      * @return boolean enabled;

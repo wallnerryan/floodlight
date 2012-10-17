@@ -1,7 +1,6 @@
 package net.floodlightcontroller.core.web;
 
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
@@ -40,6 +39,7 @@ public class ToolCheckResource extends ServerResource {
 					else if (currentTool == "firewall"){toolName = "Firewall";}
 					else {toolName = null;}
 					if (classExists("net.floodlightcontroller."+currentTool+"."+toolName)){
+						
 						//*************************************
 						//*************************************
 						//TODO call each tool's (enable method)

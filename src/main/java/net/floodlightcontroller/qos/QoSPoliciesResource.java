@@ -1,6 +1,5 @@
 package net.floodlightcontroller.qos;
 
-import net.floodlightcontroller.firewall.IFirewallService;
 
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;

@@ -663,10 +663,4 @@ public class Firewall implements IFirewallService, IOFMessageListener,
 
         return Command.CONTINUE;
     }
-
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
 }

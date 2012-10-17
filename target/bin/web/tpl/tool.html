@@ -1,10 +1,18 @@
 <h1 id="toolname"><%= toolName %>  <span class="label label-warning">Enabled: <%= enabled %></span></h1>
 <div id="info">
-<ul>
-	<li><%= restURI %></li>
-	<li><%= description %></li>
-<ul>
+</br>
+</br>
+<div><%= restURI %></div>
+</br>
+<div id="desc"><%= desc %></div>
+
 </div>
 <div id="enable"></div>
 </br>
-<div id="action-set"><button id="button" name="<%= toolName %>" type="submit" class="btn">Enable</button></div>
+<div id="action-set">
+
+<div>
+<button id="enable-button" name="<%= toolName %>" type="submit" class="btn">Enable</button>
+<span> : </span>
+<button id="disable-button" name="<%= toolName %>" type="submit" class="btn">Disable</button>
+</div>

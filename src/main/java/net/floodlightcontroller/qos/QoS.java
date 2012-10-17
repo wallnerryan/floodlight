@@ -91,7 +91,9 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	public static final String COLUMN_MATCH_ETHDST = "ethdst";
 	public static final String COLUMN_MATCH_TCPUDP_SRCPRT = "tcpudpsrcport";
 	public static final String COLUMN_MATCH_TCPUDP_DSTPRT = "tcpudpdstport";
-	public static final String COLUMN_NW_TOS = "nw_fl";
+	public static final String COLUMN_NW_TOS = "nw_tos";
+	public static final String COLUMN_IS_QUE = "is_queuing";
+	public static final String COLUMN_QUEUEID = "queueid";
 	public static String ColumnNames[] = { COLUMN_NAME, 
 										   COLUMN_NW_TOS, 
 										   COLUMN_MATCH_PROTOCOL,

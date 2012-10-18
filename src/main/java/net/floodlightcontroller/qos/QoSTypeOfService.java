@@ -4,12 +4,25 @@ public class QoSTypeOfService implements Comparable<QoSTypeOfService>{
 	
 	//TODO create params
 	
-	public int priority;
+	public int uid;
+	public String name;
+	
+	//default best effort
+	public byte tos = 0x00;
 
 	
 	public QoSTypeOfService(){
 		//TODO create this.param = value
+		this.uid = -1;
+		this.name = null;
+		this.tos = 0x00;
 	}
+	
+	//*******************************
+	//*******************************
+	//TODO CREATE GETTERS AND SETTERS
+	//*******************************
+	//*******************************
 	
 	/**
      * Comparison method for Collections.sort method

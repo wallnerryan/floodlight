@@ -1,19 +1,13 @@
 package net.floodlightcontroller.qos;
 
-
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
-import org.codehaus.jackson.map.MappingJsonFactory;
 import org.restlet.resource.Delete;
-import org.restlet.resource.Post;
 import org.restlet.resource.Get;
+import org.restlet.resource.Post;
 import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-public class QoSPoliciesResource extends ServerResource {
+public class QoSE2EPoliciesResource extends ServerResource {
 	public static Logger log = LoggerFactory.getLogger(QoSPoliciesResource.class);
 	
 	
@@ -24,16 +18,16 @@ public class QoSPoliciesResource extends ServerResource {
                 get(IQoSService.class.getCanonicalName());
 
 		// gets the list of policies currently being implemented
-        return qos.getPolicies();
+        return qos.getE2EPolicies();
 	}
 	 /**
-     * Takes a QoS Policy Rule string in JSON format and parses it into
-     * our firewall rule data structure, then adds it to the qos polcies storage.
+     * Takes a E2E QoS Policy Rule string in JSON format and parses it into
+     * our firewall rule data structure, then adds it 
      * @param fmJson The qos policy entry in JSON format.
      * @return A string status message
      */
     @Post
-    public String add(String qosJson) {
+    public String addE2E(String qosJson) {
     	
     	String status = null;
     	status = "Policy Added";
@@ -49,9 +43,7 @@ public class QoSPoliciesResource extends ServerResource {
     }
     
     //TODO implement jsonToQoSPolicy()
-    //TODO implement addToNetwork()
-    //TODO implement deleteFromNetwork()
-    
+    //TODO implement E2E
 
 
 }

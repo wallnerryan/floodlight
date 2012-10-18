@@ -24,6 +24,11 @@ public interface IQoSService extends IFloodlightService {
      * Adds a Type of Service
      */
     public void addTypeOfService(QoSTypeOfService tos);
+    
+    /**
+     * Adds a Type of Service
+     */
+    public List<QoSTypeOfService> getTypesOfService();
 
     /**
      * Deletes a Type of Service
@@ -34,16 +39,22 @@ public interface IQoSService extends IFloodlightService {
      * Returns all of the QoS rules
      * @return List of all rules
      */
-    public List<QoSPolicy> getRules();
+    public List<QoSPolicy> getPolicies();
+    
+    /**
+     * Returns all of the QoS rules
+     * @return List of all rules
+     */
+    public List<QoSPolicy> getE2EPolicies();
     
     /**
      * Adds a QoS Policy
      */
-    public void addPolicy(QoSPolicy policy);
+    public void addPolicy(QoSPolicy policy, String sw);
 
     /**
      * Deletes a QoS Policy
      */
-    public void deletePolicy(int policyid);
+    public void deletePolicy(int policyid, String sw);
     
 }

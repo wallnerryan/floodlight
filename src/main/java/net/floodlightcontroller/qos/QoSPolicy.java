@@ -47,6 +47,12 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 		
 	}
 	
+	//***********************************
+	//***********************************
+	//TODO Getters and Setters for params
+	//***********************************
+	//***********************************
+	
 	/**
      * Generates a unique ID for the instance
      * 

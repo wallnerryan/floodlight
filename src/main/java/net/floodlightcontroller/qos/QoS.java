@@ -171,7 +171,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
      */
     protected ArrayList<QoSPolicy> readPoliciesFromStorage() {
         ArrayList<QoSPolicy> l = new ArrayList<QoSPolicy>();
-        
+        //TODO *****************************************
 		return l;
     }
     
@@ -182,7 +182,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
      */
     protected ArrayList<QoSTypeOfService> readServicesFromStorage() {
         ArrayList<QoSTypeOfService> l = new ArrayList<QoSTypeOfService>();
-        
+        //TODO *****************************************
 		return l;
     }
 
@@ -258,6 +258,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		//************************************
 		//************************************
 		// Perform matching on policies, output "getting QoS, rulname, ToS or Queue
+		// logger recieving <types of qos> qos in this network
 		//************************************
 		//************************************
 		
@@ -312,7 +313,13 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	}
 
 	@Override
-	public List<QoSPolicy> getRules() {
+	public List<QoSPolicy> getPolicies() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
+	@Override
+	public List<QoSPolicy> getE2EPolicies() {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -322,6 +329,12 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		// TODO Auto-generated method stub
 		
 	}
+	
+	@Override
+	public List<QoSTypeOfService> getTypesOfService() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 	@Override
 	public void deleteTypeOfService(int tosid) {
@@ -330,15 +343,45 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	}
 
 	@Override
-	public void addPolicy(QoSPolicy policy) {
+	public void addPolicy(QoSPolicy policy, String sw) {
 		// TODO Auto-generated method stub
+		// called by web routable if add -> sw dpid
 		
 	}
 
 	@Override
-	public void deletePolicy(int policyid) {
+	public void deletePolicy(int policyid, String sw) {
 		// TODO Auto-generated method stub
+		// called by web routable if delete -> sw dpid
 		
+	}
+	
+	/** Adds a policy to all switches
+	 *  @author wallnerryan
+	**/
+	public void addPolicyToNetwork(QoSPolicy policy){
+		//TODO add to all switches in network
+		// get switches in network, each switch add policy
+		// uses addPolicy*
+		// called by web routable if add -> all
+	}
+	
+	/** Deletes a policy to all switches
+	 *  @author wallnerryan
+	**/
+	public void deletePolicyFromNetwork(QoSPolicy policy){
+		//TODO add to all switches in network
+		// get switches in network, each switch add policy
+		// uses addPolicy*
+		// called by web routable if delete -> all
+	}
+	
+	/** Creates qos along a routed path
+	 *  @author wallnerryan
+	**/
+	public void addEndToEndQoS(String srcSw, String dstSw, QoSPolicy policy){
+		//TODO possibly integrate with IRoutingService?
+		// called by web routable if  host1/to/host2
 	}
 	
 	//*********************************************************************************

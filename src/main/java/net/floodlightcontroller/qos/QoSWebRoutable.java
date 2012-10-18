@@ -16,7 +16,16 @@ public class QoSWebRoutable implements RestletRoutable{
     public Router getRestlet(Context context) {
         Router router = new Router(context);
         router.attach("/{op}/json", QoSResource.class);
-        router.attach("/policies/json", QoSPoliciesResource.class);
+        router.attach("/{add_or_del}/policy/{sw_or_all}/json", QoSPoliciesResource.class);
+        router.attach("/e2e/policy/{h-src}/{h-dst}/json", QoSE2EPoliciesResource.class);
+        
+        //*****************
+        //*****************
+        // TODO Add support for add -> all, add -> sw, add -> sw1/to/sw2 & deletes
+        // DELETE POLICY will take care of deleting for end to end policies
+        //*****************
+        //*****************
+        
         return router;
     }
 

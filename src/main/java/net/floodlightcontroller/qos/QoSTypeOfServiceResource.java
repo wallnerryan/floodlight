@@ -25,7 +25,7 @@ public class QoSTypeOfServiceResource extends ServerResource {
                 get(IQoSService.class.getCanonicalName());
 
 		// gets the list of policies currently being implemented
-        return qos.getRules();
+        return qos.getTypesOfService();
 	}
 	 /**
      *

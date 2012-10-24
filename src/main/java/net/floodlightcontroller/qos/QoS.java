@@ -62,14 +62,15 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	
 	protected IFloodlightProviderService floodlightProvider;
 	protected List<QoSPolicy> policies;
+	protected List<QoSPolicy> e2ePolicies;
 	protected List<QoSTypeOfService> services;
 	protected IRestApiService restApi;
-	protected static Logger logger;
-	protected byte diffServValue;
-	protected Integer queueId;
-	protected IPacket payLoad;
-	public boolean enabled;
 	protected IStorageSourceService storageSource;
+	protected static Logger logger;
+	
+	public boolean enabled;
+	public boolean is_queueing;
+	
 	public static final Byte default_qos = 0x00;
 	
 	//*****************************************************************
@@ -92,10 +93,10 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	public static final String COLUMN_MATCH_TCPUDP_SRCPRT = "tcpudpsrcport";
 	public static final String COLUMN_MATCH_TCPUDP_DSTPRT = "tcpudpdstport";
 	public static final String COLUMN_NW_TOS = "nw_tos";
-	public static final String COLUMN_IS_QUE = "is_queuing";
-	public static final String COLUMN_QUEUEID = "queueid";
-	public static String ColumnNames[] = { COLUMN_NAME, 
-										   COLUMN_NW_TOS, 
+	public static final String COLUMN_QUEUE = "queue";
+	public static final String COLUMN_IS_E2E= "e2e";
+	public static String ColumnNames[] = { COLUMN_POLID,
+										   COLUMN_NAME, 
 										   COLUMN_MATCH_PROTOCOL,
 										   COLUMN_MATCH_INGRESSPRT,
 										   COLUMN_MATCH_IPDST,
@@ -105,13 +106,17 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 										   COLUMN_MATCH_ETHDST,
 										   COLUMN_MATCH_TCPUDP_SRCPRT,
 										   COLUMN_MATCH_TCPUDP_DSTPRT,
-										   COLUMN_NW_TOS};
+										   COLUMN_NW_TOS,
+										   COLUMN_QUEUE,
+										   COLUMN_IS_E2E,
+										   };
 	
 	public static final String TOS_TABLE_NAME = "controller_qos_tos";
-	public static final String COLUMN_TOSID = "tosid";
-	public static final String COLUMN_TOSNAME = "tosname";
+	public static final String COLUMN_SID = "serviceid";
+	public static final String COLUMN_SNAME = "servicename";
 	public static final String COLUMN_TOSBITS = "tosbits";
-	public static String TOSColumnNames[] = {COLUMN_TOSNAME,
+	public static String TOSColumnNames[] = {COLUMN_SID,
+											 COLUMN_SNAME,
 											 COLUMN_TOSBITS};
 	
 	
@@ -171,7 +176,11 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
      */
     protected ArrayList<QoSPolicy> readPoliciesFromStorage() {
         ArrayList<QoSPolicy> l = new ArrayList<QoSPolicy>();
-        //TODO *****************************************
+        // *****************************************
+        // *****************************************
+        //TODO 
+        // *****************************************
+        // *****************************************
 		return l;
     }
     
@@ -182,7 +191,11 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
      */
     protected ArrayList<QoSTypeOfService> readServicesFromStorage() {
         ArrayList<QoSTypeOfService> l = new ArrayList<QoSTypeOfService>();
-        //TODO *****************************************
+        // *****************************************
+        // *****************************************
+        //TODO 
+        // *****************************************
+        // *****************************************
 		return l;
     }
 
@@ -194,11 +207,21 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		storageSource = context.getServiceImpl(IStorageSourceService.class);
         restApi = context.getServiceImpl(IRestApiService.class);
         policies = new ArrayList<QoSPolicy>();
+        e2ePolicies = new ArrayList<QoSPolicy>();
         services = new ArrayList<QoSTypeOfService>();
         logger = LoggerFactory.getLogger(QoS.class);
+        
         // start disabled
         enabled = false;
-
+        
+        // create default "Best Effort" service
+        // most networks use this as default, adding here for defaulting
+        QoSTypeOfService service = new QoSTypeOfService();
+        service.name = "Best Effort";
+        service.tos = (byte)0x00;
+        service.sid = service.genID();
+        this.addService(service);
+        
 	}
 	
 	@Override
@@ -217,7 +240,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
             this.policies = readPoliciesFromStorage(); 
             }
         storageSource.createTable(TOS_TABLE_NAME, null);
-        storageSource.setTablePrimaryKeyName(TOS_TABLE_NAME, COLUMN_TOSID);
+        storageSource.setTablePrimaryKeyName(TOS_TABLE_NAME, COLUMN_SID);
         synchronized (services) {
             this.services = readServicesFromStorage(); 
             }
@@ -244,15 +267,18 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 		
-		payLoad = eth.getPayload();
+		
+		//TESTTING, REDO THIS!
+		IPacket payLoad = eth.getPayload();
 		if ( payLoad instanceof IPv4) {
 				IPv4 ip = (IPv4) eth.getPayload();
-				diffServValue = ip.getDiffServ();
+				byte diffServValue = ip.getDiffServ();
+				logger.debug("DiffServ value is {}", diffServValue);
 		}
 		else{
 				payLoad = eth.getPayload();
 				payloadStr = payLoad.toString();
-				System.out.println("Not a Layer 3 Packet, Packet Payload is: "+payloadStr);
+				logger.debug("Not a Layer 3 Packet, Packet Payload is {}" ,payloadStr);
 		}
 		
 		//************************************
@@ -300,88 +326,179 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		// TODO Auto-generated method stub
 		return null;
 	}
-
+	
+	/**
+	 * Allow access to enable module
+	 * @param boolean
+	 */
 	@Override
 	public void enableQoS(boolean enable) {
 		logger.info("Setting QoS to {}", enabled);
         this.enabled = enable;	
 	}
 	
+	/**
+	 * Return whether of not the module is enabled
+	 */
 	@Override
 	public boolean isEnabled(){
 	    	return this.enabled;
 	}
-
+	/**
+	 * Return a List of Quality of Service Policies
+	 */
 	@Override
 	public List<QoSPolicy> getPolicies() {
-		// TODO Auto-generated method stub
-		return null;
+		return this.policies;
 	}
 	
+	/**
+	 * Return a list of policies that provide end to end QoS
+	 * @return List
+	 */
 	@Override
 	public List<QoSPolicy> getE2EPolicies() {
-		// TODO Auto-generated method stub
-		return null;
+		return this.e2ePolicies;
 	}
 
+	/**
+	 * Add a service class to use in policies
+	 * Used to make ToS/DiffServ Bits human readable. 
+	 * Bit notation 000000 becomes "Best Effort"
+	 * @param QoSTypeOfService
+	 */
 	@Override
-	public void addTypeOfService(QoSTypeOfService tos) {
-		// TODO Auto-generated method stub
+	public void addService(QoSTypeOfService service) {
+		// TODO 
+		/** 
+		 * Receive service from jsonToQoSTypOfService
+		 * generate an id and set it in rule
+		 * add the service to *services sorted arraylist
+		 * create a "entry" hashmap of <String , Object> to "put" appropriate values in columns
+		 * add entry as a row to correct table 
+		 */
+		//create the UID
+		service.sid = service.genID();
 		
+		//check tos bits are within bounds
+        if (service.tos >= (byte)0x00 && service.tos < (byte)0x3F ){
+        	try{
+        		//Add to the list of services
+        		this.services.add(service);
+        		
+        		//add to the storage source
+        		Map<String, Object> serviceEntry = new HashMap<String,Object>();
+        		serviceEntry.put(COLUMN_SID, Integer.toString(service.sid));
+        		serviceEntry.put(COLUMN_SNAME, service.name);
+        		serviceEntry.put(COLUMN_TOSBITS, Byte.toString(service.tos));
+        		
+        		//ad to storage
+        		storageSource.insertRow(TOS_TABLE_NAME, serviceEntry);
+        		
+        	}catch(Exception e){
+        		logger.debug("Error adding service, error: {}" ,e);
+        	}
+        }
+        else{
+        	logger.debug("Type of Service must be 0-64");
+        }
 	}
 	
+	/**
+	 * Returns a list of services available for Network Type of Service
+	 * @return List
+	 */
+	
 	@Override
-	public List<QoSTypeOfService> getTypesOfService() {
-		// TODO Auto-generated method stub
-		return null;
+	public List<QoSTypeOfService> getServices() {
+		return this.services;
 	}
 
+	/**
+	 * Removes a Network Type of Service
+	 */
 	@Override
-	public void deleteTypeOfService(int tosid) {
-		// TODO Auto-generated method stub
-		
+	public void deleteService(int sid) {
+		/**
+		// TODO called when @DELETE HTTP
+		* gets id from a list of SERVICE in web
+		* remove from list and from storage
+		**/
 	}
-
+	
+	/**
+	 * Adds a policy to a single switch
+	 * @param QoSPolicy policy
+	 * @param String sw
+	 */
 	@Override
-	public void addPolicy(QoSPolicy policy, String sw) {
+	public void addPolicy(QoSPolicy policy, long swid) {
+		/**
 		// TODO Auto-generated method stub
-		// called by web routable if add -> sw dpid
-		
+		* called by web routable if add -> sw dpid
+		* generate policyid
+		* 
+		* adds a policy to *policies and storageSource
+		* and addToNetwork because it will loop through switches
+		**/
 	}
-
+	
+	/**
+	 * Delete policy from a single switch
+	 * @param policyid
+	 * @param sw
+	 */
 	@Override
-	public void deletePolicy(int policyid, String sw) {
+	public void deletePolicy(int policyid, long swid) {
+		/**
 		// TODO Auto-generated method stub
-		// called by web routable if delete -> sw dpid
-		
+		* called by web routable if delete -> sw dpid
+		* removes policy from list and storage
+		* removes all flows that match the policy
+		**/
 	}
 	
 	/** Adds a policy to all switches
 	 *  @author wallnerryan
+	 *  @overloaded
 	**/
-	public void addPolicyToNetwork(QoSPolicy policy){
+	public void addPolicy(QoSPolicy policy){
+		/**
 		//TODO add to all switches in network
-		// get switches in network, each switch add policy
-		// uses addPolicy*
-		// called by web routable if add -> all
+		* get switches in network, each switch add policy
+		* uses addPolicy*
+		* called by web routable if add -> all
+		* create a flow out of a policy
+		* push flow to context
+		*
+		* FUTURES
+		* (catch) what if a switch does not support queuing or tos? ofconfig? 
+		**/
 	}
 	
 	/** Deletes a policy to all switches
 	 *  @author wallnerryan
+	 *  @overloaded
 	**/
-	public void deletePolicyFromNetwork(QoSPolicy policy){
+	public void deletePolicy(long policyid){
+		/**
 		//TODO add to all switches in network
-		// get switches in network, each switch add policy
-		// uses addPolicy*
-		// called by web routable if delete -> all
+		* get switches in network, each switch add policy
+		* uses deletePolicy*
+		* called by web routable if delete -> all
+		* remove from storage and list
+		* remove the flows that match the policy.name b/c policy.name == flow name
+		*
+		**/
 	}
 	
 	/** Creates qos along a routed path
 	 *  @author wallnerryan
 	**/
-	public void addEndToEndQoS(String srcSw, String dstSw, QoSPolicy policy){
+	public void addEndToEndQoS(long srcSwId, long dstSwId, QoSPolicy policy){
 		//TODO possibly integrate with IRoutingService?
 		// called by web routable if  host1/to/host2
+		// used addToSwitch from hops (switched) in the end to end path
 	}
 	
 	//*********************************************************************************

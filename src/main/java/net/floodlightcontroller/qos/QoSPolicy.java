@@ -1,5 +1,7 @@
 package net.floodlightcontroller.qos;
 
+import org.openflow.protocol.action.OFAction;
+
 import net.floodlightcontroller.qos.QoSPolicy;
 
 public class QoSPolicy implements Comparable<QoSPolicy>{
@@ -18,8 +20,7 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	public short tcpudpdstport;
 	
 	//If it is queuing, must ignore ToS bits. and set "enqueue".
-	public boolean is_queuing;
-	public short queueid;
+	public short queue;
 	
 	//default type of service to best effort
 	public byte nw_tos = 0x00;
@@ -40,8 +41,7 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 		this.ethdst = 0;
 		this.tcpudpdstport = 0;
 		this.tcpudpsrcport = 0;
-		this.is_queuing = false;
-		this.queueid = -1;
+		this.queue = -1;
 		this.nw_tos = 0x00;
 		this.priority = 0;
 		
@@ -49,9 +49,10 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	
 	//***********************************
 	//***********************************
-	//TODO Getters and Setters for params
+	//TODO Getters and Setters for params?
 	//***********************************
 	//***********************************
+	
 	
 	/**
      * Generates a unique ID for the instance

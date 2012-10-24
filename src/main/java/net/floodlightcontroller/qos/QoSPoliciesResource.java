@@ -35,6 +35,12 @@ public class QoSPoliciesResource extends ServerResource {
     @Post
     public String add(String qosJson) {
     	
+    	
+    	/**
+    	 * Need to check if sw  dpid is set, if not add to all switches,
+    	 * if sw dpid is set, add poilicy to specified switch
+    	 */
+    	
     	String status = null;
     	status = "Policy Added";
     	return ("{\"status\" : \"" + status + "\"}");

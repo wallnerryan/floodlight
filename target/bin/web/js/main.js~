@@ -96,11 +96,8 @@ var AppRouter = Backbone.Router.extend({
 
     toolDetails:function (id) {
     var t = tl.get(id);
-    //console.log(t);
-    //console.log(id);
-    //console.log(tl);
-	//console.log("switching to single tool view");
-	$('#content').html(new ToolDetailsView({model:t}).render().el);
+    //console.log("switching to single tool view");
+    $('#content').html(new ToolDetailsView({model:t}).render().el);
     $('ul.nav > li').removeClass('active');
     $('li > a[href*="/tools"]').parent().addClass('active');
 
@@ -145,4 +142,8 @@ setInterval(function () {
 
 setInterval(function () {
     hl.fetch();
+}, 3000);
+
+setInterval(function () {
+    tl.fetch();
 }, 3000);

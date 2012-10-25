@@ -109,7 +109,7 @@ window.ToolDetailsView = Backbone.View.extend({
     				alert('Enabling: '+targ.name);
     				$.ajax({
   						type: 'GET',
- 						url:hackBase + "/wm/qos/enable/json",
+ 						url:hackBase + "/wm/qos/tool/enable/json",
   						async: false,
   						success:function (data){
   							console.log(data);
@@ -152,7 +152,7 @@ window.ToolDetailsView = Backbone.View.extend({
     				alert('Disabling: '+targ.name);
     				$.ajax({
   						type: 'GET',
- 						url:hackBase + "/wm/qos/disable/json",
+ 						url:hackBase + "/wm/qos/tool/disable/json",
   						async: false,
   						success:function (data){
   							console.log(data);

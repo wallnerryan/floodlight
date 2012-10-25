@@ -15,7 +15,7 @@ public class QoSWebRoutable implements RestletRoutable{
     @Override
     public Router getRestlet(Context context) {
         Router router = new Router(context);
-        router.attach("/{op}/json", QoSResource.class);
+        router.attach("/tool/{op}/json", QoSResource.class);
         router.attach("/service/json", QoSTypeOfServiceResource.class);
         router.attach("/policy/json", QoSPoliciesResource.class);
         router.attach("/e2e/policy/{h-src}/{h-dst}/json", QoSE2EPoliciesResource.class);

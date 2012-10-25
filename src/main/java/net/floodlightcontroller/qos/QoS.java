@@ -213,15 +213,6 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
         
         // start disabled
         enabled = false;
-        
-        // create default "Best Effort" service
-        // most networks use this as default, adding here for defaulting
-        QoSTypeOfService service = new QoSTypeOfService();
-        service.name = "Best Effort";
-        service.tos = (byte)0x00;
-        service.sid = service.genID();
-        this.addService(service);
-        
 	}
 	
 	@Override
@@ -232,6 +223,8 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
         if (this.enabled == true) {
             floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
         }
+        //debug
+        logger.debug("Creating QoS tables");
         // storage, create table and read rules
         storageSource.createTable(TABLE_NAME, null);
         storageSource.setTablePrimaryKeyName(TABLE_NAME, COLUMN_POLID);
@@ -244,6 +237,14 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
         synchronized (services) {
             this.services = readServicesFromStorage(); 
             }
+        
+        // create default "Best Effort" service
+        // most networks use this as default, adding here for defaulting
+        QoSTypeOfService service = new QoSTypeOfService();
+        service.name = "Best Effort";
+        service.tos = (byte)0x00;
+        service.sid = service.genID();
+        this.addService(service);
 		
 		//*****************************************************************
 		//*****************************************************************
@@ -369,19 +370,13 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	 */
 	@Override
 	public void addService(QoSTypeOfService service) {
-		// TODO 
-		/** 
-		 * Receive service from jsonToQoSTypOfService
-		 * generate an id and set it in rule
-		 * add the service to *services sorted arraylist
-		 * create a "entry" hashmap of <String , Object> to "put" appropriate values in columns
-		 * add entry as a row to correct table 
-		 */
+		//debug
+		logger.debug("Adding Service to List and Storage");
 		//create the UID
 		service.sid = service.genID();
 		
 		//check tos bits are within bounds
-        if (service.tos >= (byte)0x00 && service.tos < (byte)0x3F ){
+        if (service.tos >= (byte)0x00 && service.tos <= (byte)0x3F ){
         	try{
         		//Add to the list of services
         		this.services.add(service);

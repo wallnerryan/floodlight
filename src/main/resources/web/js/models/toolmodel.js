@@ -110,7 +110,7 @@ function getStatus(toolName){
 		var status;
 		if(toolName == "qos"){
      	 $.ajax({
-            url:hackBase + "/wm/qos/status/json",
+            url:hackBase + "/wm/qos/tool/status/json",
             dataType:"json",
             async: false, //need this for synchronization 
             success:function (data) {

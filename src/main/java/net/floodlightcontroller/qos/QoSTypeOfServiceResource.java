@@ -67,9 +67,14 @@ public class QoSTypeOfServiceResource extends ServerResource {
     		logger.error(status);
     	}
     	else{
-    		//add service
-    		qos.addService(service);
-    		status = "Type Of Service: " + service.name + " Added";
+    		//Only add if enabled ?needed?
+    		if(qos.isEnabled()){
+    			status = "Trying to add Type Of Service: " + service.name + " " + service.tos;//add service
+    			qos.addService(service);	
+    		}
+    		else{
+    			status = "Please enable Quality of Service";
+    		}
     	}
     	return ("{\"status\" : \"" + status + "\"}");
     }
@@ -147,8 +152,16 @@ public class QoSTypeOfServiceResource extends ServerResource {
     			else if(s == "tos"){
     				//This is so you can enter a binary number or a integer number.
     				//It will be stored as a Byte
-    				Integer tmpInt = Integer.parseInt(jp.getText());
-    				service.tos = tmpInt.byteValue();
+    				try{
+    					//Try to get binary number first
+    					Integer tmpInt = Integer.parseInt(jp.getText(),2);
+    					service.tos = tmpInt.byteValue();
+    				}catch(NumberFormatException e){
+    					logger.debug("Number entered was not binary, processing as int...");
+    					//Must be entered as 0-64
+    					Integer tmpInt = Integer.parseInt(jp.getText());
+    					service.tos = tmpInt.byteValue();
+    				}
     			
     			}
     		
@@ -162,16 +175,18 @@ public class QoSTypeOfServiceResource extends ServerResource {
 		return service;
     }
     
-    //******************
-    //******************
-    //TODO
-    //******************
-    //******************
+   /**
+    * Check
+    * @param service
+    * @param services
+    * @return
+    */
     public static boolean checkIfServiceExists(QoSTypeOfService service, List<QoSTypeOfService> services){
     	Iterator<QoSTypeOfService> iter = services.iterator();
     	while(iter.hasNext()){
     		QoSTypeOfService s = iter.next();
-    		if(service.isSameAs(s)){
+    		//catch if entire service is same or name or bits
+    		if(service.isSameAs(s) ||service.name.equals(s.name) || service.equals(s.tos) ){
     			return true;
     		}
     	}

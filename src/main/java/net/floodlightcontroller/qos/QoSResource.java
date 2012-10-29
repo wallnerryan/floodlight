@@ -2,11 +2,6 @@ package net.floodlightcontroller.qos;
 
 
 import net.floodlightcontroller.qos.IQoSService;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.JsonToken;
-import org.codehaus.jackson.map.MappingJsonFactory;
-import org.restlet.resource.Post;
 import org.restlet.resource.Get;
 import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;

@@ -4,10 +4,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
-import net.floodlightcontroller.core.IListener.Command;
-import net.floodlightcontroller.firewall.FirewallRule;
 import net.floodlightcontroller.qos.IQoSService;
-
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
@@ -20,8 +17,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 
- * @author ryan wallner 
+* Copyright 2012 Marist College, New York
+* Author Ryan Wallner (ryan.wallner1@marist.edu)
+* 
+*  Licensed under the Apache License, Version 2.0 (the "License"); you may
+*  not use this file except in compliance with the License. You may obtain
+*  a copy of the License at
+*
+*         http://www.apache.org/licenses/LICENSE-2.0
+*
+*  Unless required by applicable law or agreed to in writing, software
+*  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+*  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+*  License for the specific language governing permissions and limitations
+*  under the License.
+*    
+*  Provides Queuing and L2/L3 Quality of Service Policies to a 
+*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
+*  This modules provides overlapping flowspace for policies that governed by their priority
+*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
+*  by existing "Policies" within a network.
+*  
  * 
  * code adopted from Firewall
  * @author Amer Tahir

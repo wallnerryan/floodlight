@@ -1,5 +1,30 @@
 package net.floodlightcontroller.qos;
 
+/**
+* Copyright 2012 Marist College, New York
+* Author Ryan Wallner (ryan.wallner1@marist.edu)
+* 
+*  Licensed under the Apache License, Version 2.0 (the "License"); you may
+*  not use this file except in compliance with the License. You may obtain
+*  a copy of the License at
+*
+*         http://www.apache.org/licenses/LICENSE-2.0
+*
+*  Unless required by applicable law or agreed to in writing, software
+*  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+*  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+*  License for the specific language governing permissions and limitations
+*  under the License.
+*    
+*  Provides Queuing and L2/L3 Quality of Service Policies to a 
+*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
+*  This modules provides overlapping flowspace for policies that governed by their priority
+*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
+*  by existing "Policies" within a network.
+*
+**/
+
+import java.io.IOException;
 
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;
@@ -37,8 +62,8 @@ public class QoSPoliciesResource extends ServerResource {
     	
     	
     	/**
-    	 * Need to check if sw  dpid is set, if not add to all switches,
-    	 * if sw dpid is set, add poilicy to specified switch
+    	 * if sws = all then add to all switches (addPolicy(policy))
+    	 * else addPolicy(policy, switchList)
     	 */
     	
     	String status = null;
@@ -54,9 +79,13 @@ public class QoSPoliciesResource extends ServerResource {
     	return ("{\"status\" : \"" + status + "\"}");
     }
     
-    //TODO implement jsonToQoSPolicy()
-    //TODO implement addToNetwork()
-    //TODO implement deleteFromNetwork()
+    public static QoSPolicy jsonToPolicy(String pJson) throws IOException{
+		QoSPolicy policy = new QoSPolicy();
+		
+		//TODO
+		
+    	return policy;
+    }
     
 
 

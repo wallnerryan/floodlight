@@ -16,9 +16,12 @@ package net.floodlightcontroller.qos;
 *  License for the specific language governing permissions and limitations
 *  under the License.
 *    
-*  Provides Queuing and L3 Quality of Service Policies to a 
+*  Provides Queuing and L2/L3 Quality of Service Policies to a 
 *  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  MySQL DB is needed for persistent storage of QoS policies.
+*  This modules provides overlapping flowspace for policies that governed by their priority
+*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
+*  by existing "Policies" within a network.
+*  
 **/
 
 import java.util.Collection;
@@ -27,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.openflow.protocol.OFFlowMod;
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
 
@@ -43,21 +47,15 @@ import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
 import net.floodlightcontroller.storage.IStorageSourceService;
-//import net.floodlightcontroller.qos.QoSDBStorageSource;
 import net.floodlightcontroller.qos.QoSPolicy;
 import net.floodlightcontroller.qos.QoSTypeOfService;
 import net.floodlightcontroller.core.IFloodlightProviderService;
-//import org.codehaus.jackson.JsonParseException;
-//import org.codehaus.jackson.JsonParser;
-//import org.codehaus.jackson.JsonToken;
-//import org.codehaus.jackson.map.MappingJsonFactory;
 
 import java.util.ArrayList;
-//import org.openflow.util.HexString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPusherService,
+public class QoS implements IQoSService, IFloodlightModule,
 		IOFMessageListener {
 	
 	protected IFloodlightProviderService floodlightProvider;
@@ -73,13 +71,6 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	
 	public static final Byte default_qos = 0x00;
 	
-	//*****************************************************************
-	//*****************************************************************
-	//** Un-implemented persistence storage. Using storage source first
-	//protected QoSDBStorageSource storageSource = new QoSDBStorageSource(); //stores QoS delegations
-	//*****************************************************************
-	//*****************************************************************
-	
 	public static final String TABLE_NAME = "controller_qos";
 	public static final String COLUMN_POLID = "policyid";
 	public static final String COLUMN_NAME = "name";
@@ -93,6 +84,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	public static final String COLUMN_MATCH_TCPUDP_SRCPRT = "tcpudpsrcport";
 	public static final String COLUMN_MATCH_TCPUDP_DSTPRT = "tcpudpdstport";
 	public static final String COLUMN_NW_TOS = "nw_tos";
+	public static final String COLUMN_SW = "switche";
 	public static final String COLUMN_QUEUE = "queue";
 	public static final String COLUMN_IS_E2E= "e2e";
 	public static String ColumnNames[] = { COLUMN_POLID,
@@ -107,6 +99,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 										   COLUMN_MATCH_TCPUDP_SRCPRT,
 										   COLUMN_MATCH_TCPUDP_DSTPRT,
 										   COLUMN_NW_TOS,
+										   COLUMN_SW,
 										   COLUMN_QUEUE,
 										   COLUMN_IS_E2E,
 										   };
@@ -127,16 +120,12 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 
 	@Override
 	public boolean isCallbackOrderingPrereq(OFType type, String name) {
-		// Needed for ordering of packet_in processing chain
-		// UNUSED
 		return false;
 	}
 
 	@Override
 	public boolean isCallbackOrderingPostreq(OFType type, String name) {
-		// Should process packet before going to forwarding. 
-        return (type.equals(OFType.PACKET_IN) &&
-        		name.equals("forwarding"));
+        return false;
 	}
 
 	@Override
@@ -212,6 +201,7 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
         logger = LoggerFactory.getLogger(QoS.class);
         
         // start disabled
+        // can be overridden by tools.properties.
         enabled = false;
 	}
 	
@@ -225,13 +215,16 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
         }
         //debug
         logger.debug("Creating QoS tables");
-        // storage, create table and read rules
+        
+        //Storage for policies
         storageSource.createTable(TABLE_NAME, null);
         storageSource.setTablePrimaryKeyName(TABLE_NAME, COLUMN_POLID);
         //avoid thread issues for concurrency
         synchronized (policies) {
             this.policies = readPoliciesFromStorage(); 
             }
+        
+        //Storage for services
         storageSource.createTable(TOS_TABLE_NAME, null);
         storageSource.setTablePrimaryKeyName(TOS_TABLE_NAME, COLUMN_SID);
         synchronized (services) {
@@ -245,16 +238,6 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
         service.tos = (byte)0x00;
         service.sid = service.genID();
         this.addService(service);
-		
-		//*****************************************************************
-		//*****************************************************************
-		//** Un-implemented persistence storage. Using storage source first
-		//storageSource.connectToDB();
-		//this.loadPolicies(); //from DB
-		//*****************************************************************
-		//*****************************************************************
-		//** Un-implemented persistence storage. Using storage source first
-		
 	}
 	
 	@Override
@@ -264,7 +247,6 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		// do not process packet if not enabled
 		if (!this.enabled) return Command.CONTINUE;
 		
-		String payloadStr = new String();
 		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 		
@@ -276,12 +258,6 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 				byte diffServValue = ip.getDiffServ();
 				logger.debug("DiffServ value is {}", diffServValue);
 		}
-		else{
-				payLoad = eth.getPayload();
-				payloadStr = payLoad.toString();
-				logger.debug("Not a Layer 3 Packet, Packet Payload is {}" ,payloadStr);
-		}
-		
 		//************************************
 		//************************************
 		// Perform matching on policies, output "getting QoS, rulname, ToS or Queue
@@ -290,42 +266,6 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		//************************************
 		
 		return Command.CONTINUE;
-	}
-
-	@Override
-	public void addFlow(String name, OFFlowMod fm, String swDpid) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void deleteFlow(String name) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void deleteFlowsForSwitch(long dpid) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void deleteAllFlows() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public Map<String, Map<String, OFFlowMod>> getFlows() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Map<String, OFFlowMod> getFlows(String dpid) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 	
 	/**
@@ -422,7 +362,30 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	}
 	
 	/**
-	 * Adds a policy to a single switch
+	 * 
+	 * @param policy
+	 */
+	@Override
+	public void addPolicyToNetwork(QoSPolicy policy) {
+		
+		//Get the flowmod from a policy
+		OFFlowMod flow = policyToFlowMod(policy);
+		
+		//add to all switches
+	
+	}
+	
+	/**
+	 * 
+	 * @param policy
+	 */
+	@Override
+	public void deletePolicyFromNetwork(QoSPolicy policy) {
+	
+	}
+	
+	/**
+	 * Adds a policy to a switch (dpid)
 	 * @param QoSPolicy policy
 	 * @param String sw
 	 */
@@ -436,10 +399,13 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		* adds a policy to *policies and storageSource
 		* and addToNetwork because it will loop through switches
 		**/
+		
+		//add flow to a single switch
+		//policyToFlowMod(policy)
 	}
 	
 	/**
-	 * Delete policy from a single switch
+	 * Delete policy from a switch (dpid)
 	 * @param policyid
 	 * @param sw
 	 */
@@ -454,27 +420,71 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 	}
 	
 	/** Adds a policy to all switches
+	 * 	Called when sws = "all"
 	 *  @author wallnerryan
 	 *  @overloaded
 	**/
+	@Override
 	public void addPolicy(QoSPolicy policy){
-		/**
-		//TODO add to all switches in network
-		* get switches in network, each switch add policy
-		* uses addPolicy*
-		* called by web routable if add -> all
-		* create a flow out of a policy
-		* push flow to context
-		*
-		* FUTURES
-		* (catch) what if a switch does not support queuing or tos? ofconfig? 
-		**/
+		//debug
+		logger.debug("Adding Policy to List and Storage");
+		//create the UID
+		policy.policyid = policy.genID();
+		
+		int p = 0;
+		for (p = 0; p <= this.policies.size(); p++){
+			//starts at the first(lowest) policy based on priority
+			if(this.policies.get(p).priority >= policy.priority){
+				//this keeps i to the correct positions to place new policy in
+				break;
+			}
+		}
+
+		if (p <= this.policies.size()) {
+			this.policies.add(p, policy);
+			} else {
+				this.policies.add(policy);
+	        }	
+		
+		//Add to the storageSource
+		Map<String, Object> policyEntry = new HashMap<String, Object>();
+		policyEntry.put(COLUMN_POLID, Long.toString(policy.policyid));
+		policyEntry.put(COLUMN_NAME, policy.name);
+		policyEntry.put(COLUMN_MATCH_PROTOCOL, Byte.toString(policy.protocol));
+		policyEntry.put(COLUMN_MATCH_INGRESSPRT, Short.toString(policy.ingressport));
+		policyEntry.put(COLUMN_MATCH_IPSRC, Long.toString(policy.ipsrc));
+		policyEntry.put(COLUMN_MATCH_IPDST, Long.toBinaryString(policy.ipdst));
+		policyEntry.put(COLUMN_MATCH_VLANID, Short.toString(policy.vlanid));
+		policyEntry.put(COLUMN_MATCH_ETHSRC, Long.toString(policy.ethsrc));
+		policyEntry.put(COLUMN_MATCH_ETHDST, Long.toString(policy.ethdst));
+		policyEntry.put(COLUMN_MATCH_TCPUDP_SRCPRT, Short.toString(policy.tcpudpsrcport));
+		policyEntry.put(COLUMN_MATCH_TCPUDP_DSTPRT, Short.toString(policy.tcpudpdstport));
+		policyEntry.put(COLUMN_NW_TOS, policy.nw_tos);
+		policyEntry.put(COLUMN_SW, policy.sw);
+		policyEntry.put(COLUMN_QUEUE, Short.toString(policy.queue));
+		policyEntry.put(COLUMN_IS_E2E, Boolean.toString(policy.e2e));
+		storageSource.insertRow(TABLE_NAME, policyEntry);
+		
+		//
+		//Possibly a place to add a list of switched to add to
+		//
+		
+		if (policy.sw.equals("all")){
+			logger.debug("Adding Policy {} to Entire Network", policy.toString());
+			addPolicyToNetwork(policy);
+		}
+		//add to a specified switch b/c "all" not specified
+		else {
+			logger.debug("Adding policy {} to switch {}", policy.toString(), policy.sw);
+			addPolicy(policy, Long.parseLong(policy.sw));
+			}			
 	}
 	
-	/** Deletes a policy to all switches
+	/** Deletes a policy
 	 *  @author wallnerryan
 	 *  @overloaded
 	**/
+	@Override
 	public void deletePolicy(long policyid){
 		/**
 		//TODO add to all switches in network
@@ -485,6 +495,24 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		* remove the flows that match the policy.name b/c policy.name == flow name
 		*
 		**/
+		
+		//from sw get the value "all" or "dpid"
+		//either way removes from list b/c sw policy's have a single flow instance
+		//deletePolicy(id, swid) or deletePolicyFromNetwork
+	}
+	
+	/**
+	 * Returns a flowmod from a policy
+	 * @param policy
+	 * @return
+	 */
+	public OFFlowMod policyToFlowMod(QoSPolicy policy){
+		OFMatch match = new OFMatch();
+		OFFlowMod fm = new OFFlowMod();
+		
+		//TODO create a flowmod from a policy
+		
+		return fm;
 	}
 	
 	/** Creates qos along a routed path
@@ -495,8 +523,4 @@ public class QoS implements IQoSService, IFloodlightModule, IStaticFlowEntryPush
 		// called by web routable if  host1/to/host2
 		// used addToSwitch from hops (switched) in the end to end path
 	}
-	
-	//*********************************************************************************
-	//*********************************************************************************
-	
 }

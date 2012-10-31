@@ -36,23 +36,25 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	public String name;
 	public byte protocol;
 	public short ingressport;
-	public long ipdst;
-	public long ipsrc;
+	public int ipdst;
+	public int ipsrc;
+	public byte tos;
 	public short vlanid;
-	public long ethsrc;
-	public long ethdst;
+	public String ethsrc;
+	public String ethdst;
 	public short tcpudpsrcport;
 	public short tcpudpdstport;
-	public boolean e2e;
 	
 	//Can be "all" or a "dpid"
 	public String sw;
 	
 	//If it is queuing, must ignore ToS bits. and set "enqueue".
+	//port for enqueue
 	public short queue;
+	public short enqueueport;
 	
 	//default type of service to best effort
-	public String nw_tos;
+	public String service;
 	
 	//Defaulted Priority
 	public int priority = 0;
@@ -61,20 +63,21 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	public QoSPolicy(){
 		this.policyid = 0;
 		this.name = null;
-		this.protocol = 0x00;
-		this.ingressport = 0;
-		this.ipdst = 0;
-		this.ipsrc = 0;
+		this.protocol = -1;
+		this.ingressport = -1;
+		this.ipdst = -1;
+		this.ipsrc = -1;
+		this.tos = -1;
 		this.vlanid = -1;
-		this.ethsrc = 0;
-		this.ethdst = 0;
-		this.tcpudpdstport = 0;
-		this.tcpudpsrcport = 0;
-		this.e2e = false;
+		this.ethsrc = null;
+		this.ethdst = null;
+		this.tcpudpdstport = -1;
+		this.tcpudpsrcport = -1;
 		this.sw = "all";
 		this.queue = -1;
-		this.nw_tos = null;
-		this.priority = 0;
+		this.enqueueport = -1;
+		this.service = null;
+		this.priority = 32767;
 		
 	}
 	

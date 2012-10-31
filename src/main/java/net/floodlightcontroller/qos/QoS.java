@@ -22,6 +22,8 @@ package net.floodlightcontroller.qos;
 *  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
 *  by existing "Policies" within a network.
 *  
+*  LIMITED: End-to-End policies are only supported for a single OF-Cluster
+*  
 **/
 
 import java.util.Collection;
@@ -32,7 +34,13 @@ import java.util.Map;
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMessage;
+import org.openflow.protocol.OFPacketOut;
+import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
+import org.openflow.protocol.action.OFAction;
+import org.openflow.protocol.action.OFActionEnqueue;
+import org.openflow.protocol.action.OFActionNetworkTypeOfService;
+import org.openflow.protocol.action.OFActionType;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IOFMessageListener;
@@ -59,17 +67,16 @@ public class QoS implements IQoSService, IFloodlightModule,
 		IOFMessageListener {
 	
 	protected IFloodlightProviderService floodlightProvider;
+	protected IStaticFlowEntryPusherService flowPusher;
 	protected List<QoSPolicy> policies;
-	protected List<QoSPolicy> e2ePolicies;
 	protected List<QoSTypeOfService> services;
 	protected IRestApiService restApi;
 	protected IStorageSourceService storageSource;
 	protected static Logger logger;
 	
 	public boolean enabled;
-	public boolean is_queueing;
-	
-	public static final Byte default_qos = 0x00;
+	public boolean is_queueing; //May not need
+	public static final Byte default_qos = 0x00; //May not need
 	
 	public static final String TABLE_NAME = "controller_qos";
 	public static final String COLUMN_POLID = "policyid";
@@ -86,7 +93,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public static final String COLUMN_NW_TOS = "nw_tos";
 	public static final String COLUMN_SW = "switche";
 	public static final String COLUMN_QUEUE = "queue";
-	public static final String COLUMN_IS_E2E= "e2e";
+	public static final String COLUMN_ENQPORT = "equeueport";
 	public static String ColumnNames[] = { COLUMN_POLID,
 										   COLUMN_NAME, 
 										   COLUMN_MATCH_PROTOCOL,
@@ -101,7 +108,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 										   COLUMN_NW_TOS,
 										   COLUMN_SW,
 										   COLUMN_QUEUE,
-										   COLUMN_IS_E2E,
+										   COLUMN_ENQPORT,
 										   };
 	
 	public static final String TOS_TABLE_NAME = "controller_qos_tos";
@@ -191,12 +198,13 @@ public class QoS implements IQoSService, IFloodlightModule,
 	@Override
 	public void init(FloodlightModuleContext context)
 			throws FloodlightModuleException {
+		
+		//initiate services
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		logger = LoggerFactory.getLogger(QoS.class);
 		storageSource = context.getServiceImpl(IStorageSourceService.class);
         restApi = context.getServiceImpl(IRestApiService.class);
         policies = new ArrayList<QoSPolicy>();
-        e2ePolicies = new ArrayList<QoSPolicy>();
         services = new ArrayList<QoSTypeOfService>();
         logger = LoggerFactory.getLogger(QoS.class);
         
@@ -292,16 +300,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public List<QoSPolicy> getPolicies() {
 		return this.policies;
 	}
-	
-	/**
-	 * Return a list of policies that provide end to end QoS
-	 * @return List
-	 */
-	@Override
-	public List<QoSPolicy> getE2EPolicies() {
-		return this.e2ePolicies;
-	}
-
 	/**
 	 * Add a service class to use in policies
 	 * Used to make ToS/DiffServ Bits human readable. 
@@ -371,6 +369,9 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//Get the flowmod from a policy
 		OFFlowMod flow = policyToFlowMod(policy);
 		
+		//debug
+		logger.info("adding flow {} to entire network",flow.toString());
+		
 		//add to all switches
 	
 	}
@@ -391,17 +392,11 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 */
 	@Override
 	public void addPolicy(QoSPolicy policy, long swid) {
-		/**
-		// TODO Auto-generated method stub
-		* called by web routable if add -> sw dpid
-		* generate policyid
-		* 
-		* adds a policy to *policies and storageSource
-		* and addToNetwork because it will loop through switches
-		**/
-		
-		//add flow to a single switch
-		//policyToFlowMod(policy)
+		//Get the flowmod from a policy
+		OFFlowMod flow = policyToFlowMod(policy);
+				
+		//debug
+		logger.info("adding flow {} to switch {}",flow.toString(), String.valueOf(swid));
 	}
 	
 	/**
@@ -452,17 +447,17 @@ public class QoS implements IQoSService, IFloodlightModule,
 		policyEntry.put(COLUMN_NAME, policy.name);
 		policyEntry.put(COLUMN_MATCH_PROTOCOL, Byte.toString(policy.protocol));
 		policyEntry.put(COLUMN_MATCH_INGRESSPRT, Short.toString(policy.ingressport));
-		policyEntry.put(COLUMN_MATCH_IPSRC, Long.toString(policy.ipsrc));
-		policyEntry.put(COLUMN_MATCH_IPDST, Long.toBinaryString(policy.ipdst));
+		policyEntry.put(COLUMN_MATCH_IPSRC, Integer.toString(policy.ipsrc));
+		policyEntry.put(COLUMN_MATCH_IPDST, Integer.toBinaryString(policy.ipdst));
 		policyEntry.put(COLUMN_MATCH_VLANID, Short.toString(policy.vlanid));
-		policyEntry.put(COLUMN_MATCH_ETHSRC, Long.toString(policy.ethsrc));
-		policyEntry.put(COLUMN_MATCH_ETHDST, Long.toString(policy.ethdst));
+		policyEntry.put(COLUMN_MATCH_ETHSRC, policy.ethsrc);
+		policyEntry.put(COLUMN_MATCH_ETHDST, policy.ethdst);
 		policyEntry.put(COLUMN_MATCH_TCPUDP_SRCPRT, Short.toString(policy.tcpudpsrcport));
 		policyEntry.put(COLUMN_MATCH_TCPUDP_DSTPRT, Short.toString(policy.tcpudpdstport));
-		policyEntry.put(COLUMN_NW_TOS, policy.nw_tos);
+		policyEntry.put(COLUMN_NW_TOS, policy.service);
 		policyEntry.put(COLUMN_SW, policy.sw);
 		policyEntry.put(COLUMN_QUEUE, Short.toString(policy.queue));
-		policyEntry.put(COLUMN_IS_E2E, Boolean.toString(policy.e2e));
+		policyEntry.put(COLUMN_ENQPORT, Short.toString(policy.enqueueport));
 		storageSource.insertRow(TABLE_NAME, policyEntry);
 		
 		//
@@ -507,20 +502,109 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 * @return
 	 */
 	public OFFlowMod policyToFlowMod(QoSPolicy policy){
+		//initialize a match structure that matches everything
 		OFMatch match = new OFMatch();
+		//Based on the policy match appropriately.
+		/**TODO**/
+		
+		if( policy.protocol != -1){
+			match.setNetworkProtocol(policy.protocol);
+			//debug
+			logger.debug("setting match on protocol");
+		}
+		else if(policy.ingressport != -1){
+			match.setInputPort(policy.ingressport);
+			//debug
+			logger.debug("setting match on ingress port");
+		}
+		else if(policy.ipdst != -1){
+			match.setNetworkDestination(policy.ipdst);
+			//debug
+			logger.debug("setting match on network destination");
+		}
+		else if(policy.ipsrc != -1){
+			match.setNetworkSource(policy.ipsrc);
+			//debug
+			logger.debug("setting match on network source");
+		}
+		else if(policy.vlanid != -1){
+			match.setDataLayerVirtualLan(policy.vlanid);
+			//debug
+			logger.debug("setting match on VLAN");
+		}
+		else if(policy.ethsrc != null){
+			match.setDataLayerSource(policy.ethsrc);
+			//debug
+			logger.debug("setting match on data layer source");
+		}
+		else if(policy.ethdst != null){
+			match.setDataLayerDestination(policy.ethdst);
+			//debug
+			logger.debug("setting match on data layer destination");
+		}
+		else if(policy.tcpudpsrcport != -1){
+			match.setTransportSource(policy.tcpudpsrcport);
+			//debug
+			logger.debug("setting match on transport source port");
+		}
+		else if(policy.tcpudpdstport != -1){
+			match.setTransportDestination(policy.tcpudpdstport);
+			//debug
+			logger.debug("setting match on transport destination");
+		}
+		
+		
+		//Create a flow mod using the previous match structure
 		OFFlowMod fm = new OFFlowMod();
-		
-		//TODO create a flowmod from a policy
-		
-		return fm;
-	}
-	
-	/** Creates qos along a routed path
-	 *  @author wallnerryan
-	**/
-	public void addEndToEndQoS(long srcSwId, long dstSwId, QoSPolicy policy){
-		//TODO possibly integrate with IRoutingService?
-		// called by web routable if  host1/to/host2
-		// used addToSwitch from hops (switched) in the end to end path
+		//depending on the policy nw_tos or queue the flow mod
+		// will change the type of service bits or enqueue the packets
+		/**TODO**/ 
+		if(policy.queue > -1 && policy.service == null){
+			logger.info("This policy is a queuing policy");
+			List<OFAction> actions = new ArrayList<OFAction>();
+			
+			//add the queuing action
+			OFActionEnqueue enqueue = new OFActionEnqueue();
+			enqueue.setType(OFActionType.OPAQUE_ENQUEUE); // I think this happens anyway in the constructor
+			enqueue.setPort(policy.enqueueport);
+			enqueue.setQueueId(policy.queue);
+			actions.add(enqueue);
+			
+			//add the matches and actions and return
+			fm.setMatch(match)
+				.setActions(actions)
+				.setIdleTimeout((short) 0)  // infinite
+				.setHardTimeout((short) 0)  // infinite
+				.setBufferId(OFPacketOut.BUFFER_ID_NONE)
+				.setCommand((short) 0)
+				.setFlags((short) 0)
+				.setOutPort(OFPort.OFPP_NONE.getValue())
+				.setPriority(Short.MAX_VALUE);
+		}
+		else if(policy.queue == -1 && policy.service != null){
+			logger.info("This policy is a type of service policy");
+			List<OFAction> actions = new ArrayList<OFAction>();
+			
+			//add the queuing action
+			OFActionNetworkTypeOfService setTos = new OFActionNetworkTypeOfService();
+			setTos.setType(OFActionType.SET_NW_TOS);
+			setTos.setNetworkTypeOfService(policy.tos);
+			actions.add(setTos);
+			
+			//add the matches and actions and return
+			fm.setMatch(match)
+				.setActions(actions)
+				.setIdleTimeout((short) 0)  // infinite
+				.setHardTimeout((short) 0)  // infinite
+				.setBufferId(OFPacketOut.BUFFER_ID_NONE)
+				.setCommand((short) 0)
+				.setFlags((short) 0)
+				.setOutPort(OFPort.OFPP_NONE.getValue())
+				.setPriority(Short.MAX_VALUE);
+		}
+		else{
+			logger.error("Policy Misconfiguration");
+		}
+	return fm;	
 	}
 }

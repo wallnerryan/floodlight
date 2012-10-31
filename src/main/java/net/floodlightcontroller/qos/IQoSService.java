@@ -67,12 +67,6 @@ public interface IQoSService extends IFloodlightService {
     public List<QoSPolicy> getPolicies();
     
     /**
-     * Returns all of the QoS rules
-     * @return List of all rules
-     */
-    public List<QoSPolicy> getE2EPolicies();
-    
-    /**
      * 
      * @param policy
      */

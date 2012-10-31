@@ -18,8 +18,6 @@ public class QoSWebRoutable implements RestletRoutable{
         router.attach("/tool/{op}/json", QoSResource.class);
         router.attach("/service/json", QoSTypeOfServiceResource.class);
         router.attach("/policy/json", QoSPoliciesResource.class);
-        router.attach("/e2e/policy/{h-src}/{h-dst}/json", QoSE2EPoliciesResource.class);
-        
         return router;
     }
 

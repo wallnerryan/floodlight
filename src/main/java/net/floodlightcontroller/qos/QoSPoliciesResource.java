@@ -2,6 +2,7 @@ package net.floodlightcontroller.qos;
 
 /**
 * Copyright 2012 Marist College, New York
+
 * Author Ryan Wallner (ryan.wallner1@marist.edu)
 * 
 *  Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -25,7 +26,6 @@ package net.floodlightcontroller.qos;
 **/
 
 import java.io.IOException;
-
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class QoSPoliciesResource extends ServerResource {
-	public static Logger log = LoggerFactory.getLogger(QoSPoliciesResource.class);
+	public static Logger logger = LoggerFactory.getLogger(QoSPoliciesResource.class);
 	
 	
 	@Get("json")
@@ -51,6 +51,7 @@ public class QoSPoliciesResource extends ServerResource {
 		// gets the list of policies currently being implemented
         return qos.getPolicies();
 	}
+	
 	 /**
      * Takes a QoS Policy Rule string in JSON format and parses it into
      * our firewall rule data structure, then adds it to the qos polcies storage.
@@ -59,12 +60,25 @@ public class QoSPoliciesResource extends ServerResource {
      */
     @Post
     public String add(String qosJson) {
+    	IQoSService qos = 
+    			(IQoSService)getContext().getAttributes().
+    			get(IQoSService.class.getCanonicalName());
     	
+    	//create empty policy
+    	QoSPolicy policy;
+    	try{
+    		policy = jsonToPolicy(qosJson);
+    	}
+    	catch(IOException e){
+    		logger.error("Error Parsing Quality of Service Policy to JSON: {}, Error: {}", qosJson, e);
+    		e.printStackTrace();
+    		return "{\"status\" : \"Error! Could not parse polocy, see log for details.\"}";
+    	}
     	
     	/**
-    	 * if sws = all then add to all switches (addPolicy(policy))
-    	 * else addPolicy(policy, switchList)
-    	 */
+		 * 	TODO
+		 *  !!!!!!!!!!!!!!!!!!!!!!!!!!
+		 */
     	
     	String status = null;
     	status = "Policy Added";
@@ -82,7 +96,10 @@ public class QoSPoliciesResource extends ServerResource {
     public static QoSPolicy jsonToPolicy(String pJson) throws IOException{
 		QoSPolicy policy = new QoSPolicy();
 		
-		//TODO
+		/**
+		 * 	TODO
+		 *  !!!!!!!!!!!!!!!!!!!!!!!!!!
+		 */
 		
     	return policy;
     }

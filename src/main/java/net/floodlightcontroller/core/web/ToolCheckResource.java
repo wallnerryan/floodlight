@@ -28,9 +28,7 @@ public class ToolCheckResource extends ServerResource {
     		protected String is_enabled;
     		protected String currentTool;
     		protected String toolName;
-    		
-        
-    		
+    		    		
     		public HashMap<String,String> getTools(){
     			HashMap<String,String> toolSet = 
     					new HashMap<String,String>();

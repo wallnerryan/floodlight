@@ -68,6 +68,7 @@ public class QoSTypeOfServiceResource extends ServerResource {
     			(IQoSService)getContext().getAttributes().
     			get(IQoSService.class.getCanonicalName());
     	
+    	//dummy service
     	QoSTypeOfService service;
     	try{
     		service = jsonToService(tosJson);
@@ -126,7 +127,7 @@ public class QoSTypeOfServiceResource extends ServerResource {
     	}
     	
     	//debug for dev
-    	System.out.println("JSON Object POSTED is " +jp.toString());
+    	logger.info("JSON Object POSTED is " +jp.toString());
     	
     	//see if the the current token is '{' to start processing json objects
     	JsonToken tkn = jp.getCurrentToken();

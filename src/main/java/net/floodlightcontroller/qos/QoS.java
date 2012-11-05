@@ -41,6 +41,7 @@ import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionEnqueue;
 import org.openflow.protocol.action.OFActionNetworkTypeOfService;
 import org.openflow.protocol.action.OFActionType;
+import org.openflow.util.HexString;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IOFMessageListener;
@@ -82,6 +83,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public static final String COLUMN_POLID = "policyid";
 	public static final String COLUMN_NAME = "name";
 	public static final String COLUMN_MATCH_PROTOCOL = "protocol";
+	public static final String COLUMN_MATCH_ETHTYPE = "eth-type";
 	public static final String COLUMN_MATCH_INGRESSPRT = "ingressport";
 	public static final String COLUMN_MATCH_IPDST = "ipdst";
 	public static final String COLUMN_MATCH_IPSRC = "ipsrc";
@@ -94,22 +96,14 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public static final String COLUMN_SW = "switche";
 	public static final String COLUMN_QUEUE = "queue";
 	public static final String COLUMN_ENQPORT = "equeueport";
+	public static final String COLUMN_PRIORITY = "priority";
+	public static final String COLUMN_SERVICE = "service";
 	public static String ColumnNames[] = { COLUMN_POLID,
-										   COLUMN_NAME, 
-										   COLUMN_MATCH_PROTOCOL,
-										   COLUMN_MATCH_INGRESSPRT,
-										   COLUMN_MATCH_IPDST,
-										   COLUMN_MATCH_IPSRC,
-										   COLUMN_MATCH_VLANID,
-										   COLUMN_MATCH_ETHSRC,
-										   COLUMN_MATCH_ETHDST,
-										   COLUMN_MATCH_TCPUDP_SRCPRT,
-										   COLUMN_MATCH_TCPUDP_DSTPRT,
-										   COLUMN_NW_TOS,
-										   COLUMN_SW,
-										   COLUMN_QUEUE,
-										   COLUMN_ENQPORT,
-										   };
+			COLUMN_NAME,COLUMN_MATCH_PROTOCOL, COLUMN_MATCH_ETHTYPE,COLUMN_MATCH_INGRESSPRT,
+			COLUMN_MATCH_IPDST,COLUMN_MATCH_IPSRC,COLUMN_MATCH_VLANID,
+			COLUMN_MATCH_ETHSRC,COLUMN_MATCH_ETHDST,COLUMN_MATCH_TCPUDP_SRCPRT,
+			COLUMN_MATCH_TCPUDP_DSTPRT,COLUMN_NW_TOS,COLUMN_SW,
+			COLUMN_QUEUE,COLUMN_ENQPORT,COLUMN_PRIORITY,COLUMN_SERVICE,};
 	
 	public static final String TOS_TABLE_NAME = "controller_qos_tos";
 	public static final String COLUMN_SID = "serviceid";
@@ -118,7 +112,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public static String TOSColumnNames[] = {COLUMN_SID,
 											 COLUMN_SNAME,
 											 COLUMN_TOSBITS};
-	
 	
 	@Override
 	public String getName() {
@@ -370,7 +363,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 		OFFlowMod flow = policyToFlowMod(policy);
 		
 		//debug
-		logger.info("adding flow {} to entire network",flow.toString());
+		logger.info("adding flow {} to all switches",flow.toString());
 		
 		//add to all switches
 	
@@ -428,6 +421,11 @@ public class QoS implements IQoSService, IFloodlightModule,
 		
 		int p = 0;
 		for (p = 0; p <= this.policies.size(); p++){
+			//check if empy
+			if(this.policies.isEmpty()){
+				//p is zero
+				break;
+			}
 			//starts at the first(lowest) policy based on priority
 			if(this.policies.get(p).priority >= policy.priority){
 				//this keeps i to the correct positions to place new policy in
@@ -445,7 +443,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 		Map<String, Object> policyEntry = new HashMap<String, Object>();
 		policyEntry.put(COLUMN_POLID, Long.toString(policy.policyid));
 		policyEntry.put(COLUMN_NAME, policy.name);
-		policyEntry.put(COLUMN_MATCH_PROTOCOL, Byte.toString(policy.protocol));
+		policyEntry.put(COLUMN_MATCH_PROTOCOL, Short.toString(policy.protocol));
+		policyEntry.put(COLUMN_MATCH_ETHTYPE, Short.toString(policy.ethtype));
 		policyEntry.put(COLUMN_MATCH_INGRESSPRT, Short.toString(policy.ingressport));
 		policyEntry.put(COLUMN_MATCH_IPSRC, Integer.toString(policy.ipsrc));
 		policyEntry.put(COLUMN_MATCH_IPDST, Integer.toBinaryString(policy.ipdst));
@@ -458,21 +457,31 @@ public class QoS implements IQoSService, IFloodlightModule,
 		policyEntry.put(COLUMN_SW, policy.sw);
 		policyEntry.put(COLUMN_QUEUE, Short.toString(policy.queue));
 		policyEntry.put(COLUMN_ENQPORT, Short.toString(policy.enqueueport));
+		policyEntry.put(COLUMN_PRIORITY, Short.toString(policy.priority));
+		policyEntry.put(COLUMN_SERVICE, policy.service);
 		storageSource.insertRow(TABLE_NAME, policyEntry);
 		
 		//
 		//Possibly a place to add a list of switched to add to
 		//
 		
+		//regex for dpid string, this can/needs to be more elegent. Maybe use of a Matcher
+		final String dpidPattern = "[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]" +
+				":[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]";
+		
 		if (policy.sw.equals("all")){
 			logger.debug("Adding Policy {} to Entire Network", policy.toString());
 			addPolicyToNetwork(policy);
 		}
 		//add to a specified switch b/c "all" not specified
-		else {
+		else if(policy.sw.matches(dpidPattern)){
 			logger.debug("Adding policy {} to switch {}", policy.toString(), policy.sw);
-			addPolicy(policy, Long.parseLong(policy.sw));
-			}			
+			// add appropriate hex string converted to a long type
+			addPolicy(policy, HexString.toLong(policy.sw));
+			}	
+		else{
+			logger.error("***Policy {} error at switch input {} ***", policy.toString(), policy.sw);
+		}
 	}
 	
 	/** Deletes a policy
@@ -505,53 +514,65 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//initialize a match structure that matches everything
 		OFMatch match = new OFMatch();
 		//Based on the policy match appropriately.
-		/**TODO**/
 		
-		if( policy.protocol != -1){
+		if(policy.ethtype != -1){
+			match.setDataLayerType((policy.ethtype));
+			//debug
+			logger.debug("setting match on eth-type");
+		}
+		if(policy.protocol != -1){
 			match.setNetworkProtocol(policy.protocol);
 			//debug
 			logger.debug("setting match on protocol");
 		}
-		else if(policy.ingressport != -1){
+		if(policy.ingressport != -1){
 			match.setInputPort(policy.ingressport);
 			//debug
 			logger.debug("setting match on ingress port");
 		}
-		else if(policy.ipdst != -1){
+		if(policy.ipdst != -1){
 			match.setNetworkDestination(policy.ipdst);
 			//debug
 			logger.debug("setting match on network destination");
 		}
-		else if(policy.ipsrc != -1){
+		if(policy.ipsrc != -1){
 			match.setNetworkSource(policy.ipsrc);
 			//debug
 			logger.debug("setting match on network source");
 		}
-		else if(policy.vlanid != -1){
+		if(policy.vlanid != -1){
 			match.setDataLayerVirtualLan(policy.vlanid);
 			//debug
 			logger.debug("setting match on VLAN");
 		}
-		else if(policy.ethsrc != null){
+		if(policy.tos != -1){
+			match.setNetworkTypeOfService(policy.tos);
+			//debug
+			logger.debug("setting match on ToS");
+		}
+		if(policy.ethsrc != null){
 			match.setDataLayerSource(policy.ethsrc);
 			//debug
 			logger.debug("setting match on data layer source");
 		}
-		else if(policy.ethdst != null){
+		if(policy.ethdst != null){
 			match.setDataLayerDestination(policy.ethdst);
 			//debug
 			logger.debug("setting match on data layer destination");
 		}
-		else if(policy.tcpudpsrcport != -1){
+		if(policy.tcpudpsrcport != -1){
 			match.setTransportSource(policy.tcpudpsrcport);
 			//debug
 			logger.debug("setting match on transport source port");
 		}
-		else if(policy.tcpudpdstport != -1){
+		if(policy.tcpudpdstport != -1){
 			match.setTransportDestination(policy.tcpudpdstport);
 			//debug
 			logger.debug("setting match on transport destination");
 		}
+		//debug
+		/**THIS IS EMPTY!!!??**/
+		logger.info("Match is : {}", match.toString());
 		
 		
 		//Create a flow mod using the previous match structure
@@ -579,19 +600,29 @@ public class QoS implements IQoSService, IFloodlightModule,
 				.setCommand((short) 0)
 				.setFlags((short) 0)
 				.setOutPort(OFPort.OFPP_NONE.getValue())
-				.setPriority(Short.MAX_VALUE);
+				.setPriority(policy.priority);
 		}
 		else if(policy.queue == -1 && policy.service != null){
 			logger.info("This policy is a type of service policy");
 			List<OFAction> actions = new ArrayList<OFAction>();
 			
 			//add the queuing action
-			OFActionNetworkTypeOfService setTos = new OFActionNetworkTypeOfService();
-			setTos.setType(OFActionType.SET_NW_TOS);
-			setTos.setNetworkTypeOfService(policy.tos);
-			actions.add(setTos);
+			OFActionNetworkTypeOfService tosAction = new OFActionNetworkTypeOfService();
+			tosAction.setType(OFActionType.SET_NW_TOS);
 			
-			//add the matches and actions and return
+			//Find the appropriate type of service bits in policy
+			Byte pTos = null;
+			List<QoSTypeOfService> serviceList = this.getServices();
+			for(QoSTypeOfService s : serviceList){
+				if(s.name == policy.service){
+					//
+					pTos = s.tos;
+				}
+			}
+			tosAction.setNetworkTypeOfService(pTos);
+			actions.add(tosAction);
+			
+			//add the matches and actions and return.class.ge
 			fm.setMatch(match)
 				.setActions(actions)
 				.setIdleTimeout((short) 0)  // infinite

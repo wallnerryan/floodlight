@@ -34,6 +34,7 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	//create params
 	public long policyid;
 	public String name;
+	public short ethtype;
 	public byte protocol;
 	public short ingressport;
 	public int ipdst;
@@ -57,12 +58,13 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	public String service;
 	
 	//Defaulted Priority
-	public int priority = 0;
+	public short priority = 0;
 	
-
+	// -1's are check in QoS.java: policyToFlowMod()
 	public QoSPolicy(){
 		this.policyid = 0;
 		this.name = null;
+		this.ethtype = -1;
 		this.protocol = -1;
 		this.ingressport = -1;
 		this.ipdst = -1;
@@ -97,11 +99,11 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	
 	/**
      * Comparison method for Collections.sort method
-     * @param rule the rule to compare with
+     * @param rule the policy to compare with
      * @return number representing the result of comparison
      * 0 if equal
-     * negative if less than 'rule'
-     * greater than zero if greater priority rule than 'rule'
+     * negative if less than 'policy'
+     * greater than zero if greater priority policy than 'policy'
      */
 	public int compareTo(QoSPolicy policy) {
 		return this.priority - ((QoSPolicy)policy).priority;
@@ -113,10 +115,7 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	 * @return
 	 */
 	public boolean isSameAs(QoSPolicy policy){
-		
-		//TODO add more to this check
-		
-		if (this.equals(policy)){
+		if (this.equals(policy) || this.name.equals(policy.name)){
 			return true;
 		}
 		else{

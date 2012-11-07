@@ -28,7 +28,6 @@ package net.floodlightcontroller.qos;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-
 import net.floodlightcontroller.packet.IPv4;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonParser;
@@ -87,9 +86,16 @@ public class QoSPoliciesResource extends ServerResource {
     	else{
     		//Only add if enabled ?needed?
     		if(qos.isEnabled()){
+    			/**NOTE: the check for how its added happens 
+				 * inside addPolicy:(AROUND QoS.java:467)**/
     			status = "Trying to Policy: " + policy.name;//add service
-    			/**NOTE: the check for how its added happens inside addPolicy:(AROUND QoS.java:467)**/
-    			qos.addPolicy(policy);	
+    			//basic checks on validity
+    			if(policy.service == null && policy.enqueueport != -1 && policy.queue != -1){
+    				qos.addPolicy(policy);
+    			}else if(checkIfServiceExists(policy.service, qos.getServices())
+    					&& policy.enqueueport == -1 && policy.queue == -1){
+    				qos.addPolicy(policy);
+    			}else{status = "Policy must be defined as a Service policy or a Queuing Policy Only";}
     		}
     		else{
     			status = "Please enable Quality of Service";
@@ -149,9 +155,7 @@ public class QoSPoliciesResource extends ServerResource {
     				//back to beginning of loop
     				continue;
     			}
-    			
     			//Could use switch if JRE 1.7 compliant
-    				
     			//using if else for now
     			if (tmpS == "name"){
     				policy.name = jp.getText();
@@ -164,9 +168,10 @@ public class QoSPoliciesResource extends ServerResource {
     			}
     			else if(tmpS == "eth-type"){
     				// i.e "eth-type":"0x0800"
-    				if (tmpS.startsWith("0x"))
-                		policy.ethtype = U16.t(Integer.valueOf(
-                				tmpS.replaceFirst("0x", ""),16).byteValue());
+					if (jp.getText().startsWith("0x")) {
+						policy.ethtype = U16.t(Integer.valueOf
+								(jp.getText().replaceFirst("0x",""),16));
+					}
     				logger.info("[JSON PARSER]Policy Eth-type: {}", jp.getText());	
     			}
     			else if(tmpS == "ingress-port"){
@@ -175,11 +180,11 @@ public class QoSPoliciesResource extends ServerResource {
     			}
     			else if(tmpS == "ip-src"){
     				policy.ipsrc = IPv4.toIPv4Address(jp.getText());
-    				logger.info("[JSON PARSER]Policy IP-Src: {}", jp.getText());
+    				logger.info("[JSON PARSER]Policy IP-Src: {}", IPv4.fromIPv4Address(policy.ipsrc));
     			}
     			else if(tmpS == "ip-dst"){
     				policy.ipdst = IPv4.toIPv4Address(jp.getText());
-    				logger.info("[JSON PARSER]Policy IP-Dst: {}", jp.getText());		
+    				logger.info("[JSON PARSER]Policy IP-Dst: {}", IPv4.fromIPv4Address(policy.ipdst));		
     			}
     			else if(tmpS == "tos"){
     				//This is so you can enter a binary number or a integer number.
@@ -259,6 +264,24 @@ public class QoSPoliciesResource extends ServerResource {
 		while(pIter.hasNext()){
 			QoSPolicy p = pIter.next();
 			if(policy.isSameAs(p) || policy.name.equals(p.name)){
+				return true;
+			}
+		}
+		return false;
+	}
+    
+    /**
+     * 
+     * @param service
+     * @param services
+     * @return
+     */
+    private static boolean checkIfServiceExists(String service,
+			List<QoSTypeOfService> services) {
+		Iterator<QoSTypeOfService> sIter = services.iterator();
+		while(sIter.hasNext()){
+			QoSTypeOfService s = sIter.next();
+			if(s.name.equals(service)){
 				return true;
 			}
 		}

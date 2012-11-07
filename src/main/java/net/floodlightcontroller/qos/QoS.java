@@ -514,6 +514,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//initialize a match structure that matches everything
 		OFMatch match = new OFMatch();
 		//Based on the policy match appropriately.
+		match.setWildcards(0);
 		
 		if(policy.ethtype != -1){
 			match.setDataLayerType((policy.ethtype));
@@ -523,12 +524,12 @@ public class QoS implements IQoSService, IFloodlightModule,
 		if(policy.protocol != -1){
 			match.setNetworkProtocol(policy.protocol);
 			//debug
-			logger.debug("setting match on protocol");
+			logger.debug("setting match on protocol ");
 		}
 		if(policy.ingressport != -1){
 			match.setInputPort(policy.ingressport);
 			//debug
-			logger.debug("setting match on ingress port");
+			logger.debug("setting match on ingress port ");
 		}
 		if(policy.ipdst != -1){
 			match.setNetworkDestination(policy.ipdst);
@@ -570,10 +571,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 			//debug
 			logger.debug("setting match on transport destination");
 		}
-		//debug
-		/**THIS IS EMPTY!!!??**/
-		logger.info("Match is : {}", match.toString());
-		
 		
 		//Create a flow mod using the previous match structure
 		OFFlowMod fm = new OFFlowMod();
@@ -591,6 +588,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			enqueue.setQueueId(policy.queue);
 			actions.add(enqueue);
 			
+			logger.info("Match is : {}", match.toString());
 			//add the matches and actions and return
 			fm.setMatch(match)
 				.setActions(actions)
@@ -614,7 +612,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			Byte pTos = null;
 			List<QoSTypeOfService> serviceList = this.getServices();
 			for(QoSTypeOfService s : serviceList){
-				if(s.name == policy.service){
+				if(s.name.equals(policy.service)){
 					//
 					pTos = s.tos;
 				}
@@ -622,6 +620,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			tosAction.setNetworkTypeOfService(pTos);
 			actions.add(tosAction);
 			
+			logger.info("Match is : {}", match.toString());
 			//add the matches and actions and return.class.ge
 			fm.setMatch(match)
 				.setActions(actions)

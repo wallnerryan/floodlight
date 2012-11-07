@@ -27,6 +27,8 @@ package net.floodlightcontroller.qos;
 * @edited KC Wang
 **/
 
+import org.openflow.util.HexString;
+
 import net.floodlightcontroller.qos.QoSPolicy;
 
 public class QoSPolicy implements Comparable<QoSPolicy>{
@@ -123,4 +125,29 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 		}
 	}
 	
+	@Override
+	public int hashCode(){
+	final int prime = 2521;
+    int result = super.hashCode();
+    result = prime * result + (int) policyid;
+    result = prime * result + Integer.parseInt(name);
+    result = prime * result + ethtype;
+    result = prime * result + protocol;
+    result = prime * result + ingressport;
+    result = prime * result + ipdst;
+    result = prime * result + ipsrc;
+    result = prime * result + tos;
+    result = prime * result + vlanid;
+    result = prime * result + (int) HexString.toLong(ethsrc);
+    result = prime * result + (int) HexString.toLong(ethdst);
+    result = prime * result + tcpudpsrcport;
+    result = prime * result + tcpudpdstport;
+    result = prime * result + Integer.parseInt(sw);
+    result = prime * result + queue;
+    result = prime * result + enqueueport;
+    result = prime * result + Integer.parseInt(service);
+    result = prime * result + priority;
+	
+    return result;
+	}
 }

@@ -574,6 +574,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 		
 		//Create a flow mod using the previous match structure
 		OFFlowMod fm = new OFFlowMod();
+		fm.setType(OFType.FLOW_MOD);
 		//depending on the policy nw_tos or queue the flow mod
 		// will change the type of service bits or enqueue the packets
 		/**TODO**/ 

@@ -43,13 +43,6 @@ public class QoSTypeOfService implements Comparable<QoSTypeOfService>{
 		this.name = null;
 		this.tos = 0x00;
 	}
-	
-	//*******************************
-	//*******************************
-	//TODO CREATE GETTERS AND SETTERS?
-	//*******************************
-	//*******************************
-	
 	/**
      * Generates a unique ID for the instance
      * 
@@ -93,4 +86,13 @@ public class QoSTypeOfService implements Comparable<QoSTypeOfService>{
 		}
 	}
 
+	@Override
+	public int hashCode(){
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + (int) sid;
+		if(name != null){result = prime * result +  name.hashCode();}
+		result = prime * result + (int) tos;
+		return result;
+	}
 }

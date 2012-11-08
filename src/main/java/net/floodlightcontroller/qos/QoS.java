@@ -76,8 +76,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	protected static Logger logger;
 	
 	public boolean enabled;
-	public boolean is_queueing; //May not need
-	public static final Byte default_qos = 0x00; //May not need
 	
 	public static final String TABLE_NAME = "controller_qos";
 	public static final String COLUMN_POLID = "policyid";
@@ -204,6 +202,16 @@ public class QoS implements IQoSService, IFloodlightModule,
         // start disabled
         // can be overridden by tools.properties.
         enabled = false;
+        
+        /** 
+         * 
+         * 
+         * 
+         * TODO check enabled from properties 
+         * 
+         * 
+         * 
+         * **/
 	}
 	
 	@Override
@@ -310,6 +318,7 @@ public class QoS implements IQoSService, IFloodlightModule,
         if (service.tos >= (byte)0x00 && service.tos <= (byte)0x3F ){
         	try{
         		//Add to the list of services
+        		//un-ordered, naturally a short list
         		this.services.add(service);
         		
         		//add to the storage source
@@ -353,20 +362,24 @@ public class QoS implements IQoSService, IFloodlightModule,
 	}
 	
 	/**
-	 * 
+	 * Add a policy-flowMod to all switches in network
 	 * @param policy
 	 */
 	@Override
 	public void addPolicyToNetwork(QoSPolicy policy) {
-		
 		//Get the flowmod from a policy
 		OFFlowMod flow = policyToFlowMod(policy);
-		
 		//debug
-		logger.info("adding flow {} to all switches",flow.toString());
-		
+		logger.info("adding policy-flow {} to all switches",flow.toString());
 		//add to all switches
-	
+		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
+		//simple check
+		if(!(switches.isEmpty())){
+			for(IOFSwitch sw : switches.values()){
+				logger.info("Switch : {} DPID : {}",sw.getStringId(), sw.getId());
+				flowPusher.addFlow(policy.name, flow, sw.getStringId());
+			}
+		}
 	}
 	
 	/**
@@ -514,6 +527,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//initialize a match structure that matches everything
 		OFMatch match = new OFMatch();
 		//Based on the policy match appropriately.
+		
+		//no wildcards
 		match.setWildcards(0);
 		
 		if(policy.ethtype != -1){
@@ -614,7 +629,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			List<QoSTypeOfService> serviceList = this.getServices();
 			for(QoSTypeOfService s : serviceList){
 				if(s.name.equals(policy.service)){
-					//
+					//policy's service ToS bits
 					pTos = s.tos;
 				}
 			}

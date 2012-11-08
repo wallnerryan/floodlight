@@ -37,7 +37,13 @@ public class ToolCheckResource extends ServerResource {
     				prop.load(new FileInputStream("src/main/resources/tools.properties"));
     				tools = prop.getProperty("tools").split(",");
 			
-    				//Return only the enabled tools
+    				
+    				/** Feature request: add the turn on on start-up properties
+    				 *  to the init function of the tool using the getName() functions
+    				 *  as the name of the tool, use this name for the properties
+    				 *  file too. **/
+    				
+    				//Return tools
     				for (int i=0; i<tools.length; i++){
     					//Tool information from properties file
     					currentTool = tools[i];

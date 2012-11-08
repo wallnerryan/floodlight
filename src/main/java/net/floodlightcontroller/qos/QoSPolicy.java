@@ -130,23 +130,23 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	final int prime = 2521;
     int result = super.hashCode();
     result = prime * result + (int) policyid;
-    result = prime * result + Integer.parseInt(name);
-    result = prime * result + ethtype;
-    result = prime * result + protocol;
-    result = prime * result + ingressport;
+    if(name != null){result = prime * result + name.hashCode();}
+    result = prime * result + (int) ethtype;
+    result = prime * result + (int) protocol;
+    result = prime * result + (int) ingressport;
     result = prime * result + ipdst;
     result = prime * result + ipsrc;
-    result = prime * result + tos;
-    result = prime * result + vlanid;
+    result = prime * result + (int) tos;
+    result = prime * result + (int) vlanid;
     result = prime * result + (int) HexString.toLong(ethsrc);
     result = prime * result + (int) HexString.toLong(ethdst);
-    result = prime * result + tcpudpsrcport;
-    result = prime * result + tcpudpdstport;
-    result = prime * result + Integer.parseInt(sw);
-    result = prime * result + queue;
-    result = prime * result + enqueueport;
-    result = prime * result + Integer.parseInt(service);
-    result = prime * result + priority;
+    result = prime * result + (int) tcpudpsrcport;
+    result = prime * result + (int) tcpudpdstport;
+    if(sw != null){result = prime * result + sw.hashCode();}
+    result = prime * result + (int) queue;
+    result = prime * result + (int) enqueueport;
+    if(service != null){result = prime * result + service.hashCode();}
+    result = prime * result + (int) priority;
 	
     return result;
 	}

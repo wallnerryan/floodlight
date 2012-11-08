@@ -149,6 +149,9 @@ public class QoSPoliciesResource extends ServerResource {
     			String tmpS = jp.getCurrentName();
     			jp.nextToken();
     			
+    			/** may be worth: jsonText = jp.getText(); to avoid over
+    			 *  use of jp.getText() method call **/
+    			
     			//get current text of the FIELD_NAME
     			logger.info("Current text is "+ jp.getText()); //debug for dev
     			if(jp.getText().equals("")){

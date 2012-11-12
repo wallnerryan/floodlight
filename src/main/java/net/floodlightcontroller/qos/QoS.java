@@ -50,9 +50,6 @@ import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
-import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.packet.IPacket;
-import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
 import net.floodlightcontroller.storage.IStorageSourceService;
@@ -192,13 +189,13 @@ public class QoS implements IQoSService, IFloodlightModule,
 		
 		//initiate services
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
+		flowPusher = context.getServiceImpl(IStaticFlowEntryPusherService.class);
 		logger = LoggerFactory.getLogger(QoS.class);
 		storageSource = context.getServiceImpl(IStorageSourceService.class);
         restApi = context.getServiceImpl(IRestApiService.class);
         policies = new ArrayList<QoSPolicy>();
         services = new ArrayList<QoSTypeOfService>();
         logger = LoggerFactory.getLogger(QoS.class);
-        
         // start disabled
         // can be overridden by tools.properties.
         enabled = false;
@@ -256,17 +253,13 @@ public class QoS implements IQoSService, IFloodlightModule,
 		// do not process packet if not enabled
 		if (!this.enabled) return Command.CONTINUE;
 		
-		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
-                IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-		
-		
-		//TESTTING, REDO THIS!
-		IPacket payLoad = eth.getPayload();
-		if ( payLoad instanceof IPv4) {
-				IPv4 ip = (IPv4) eth.getPayload();
-				byte diffServValue = ip.getDiffServ();
-				logger.debug("DiffServ value is {}", diffServValue);
-		}
+		switch (msg.getType()) {
+        case FLOW_MOD:
+            break;
+        default:
+            return Command.CONTINUE;
+        }
+		// if the flowmod is a policy
 		//************************************
 		//************************************
 		// Perform matching on policies, output "getting QoS, rulname, ToS or Queue
@@ -376,8 +369,13 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//simple check
 		if(!(switches.isEmpty())){
 			for(IOFSwitch sw : switches.values()){
-				logger.info("Switch : {} DPID : {}",sw.getStringId(), sw.getId());
-				flowPusher.addFlow(policy.name, flow, sw.getStringId());
+				if(!(sw.isConnected())){
+					break;// cannot add
+				}
+				//logger.info("Switch : {} DPID : {}",sw.getStringId(), sw.getId());
+				logger.info("Add flow Name: {} Flow: {} Switch "+ sw.getStringId(), 
+				policy.name, flow.toString());
+				flowPusher.addFlow(policy.name, flow, sw.getStringId());	
 			}
 		}
 	}
@@ -440,6 +438,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 				break;
 			}
 			//starts at the first(lowest) policy based on priority
+			//insertion sort, gets hairy when n # of switches increases. 
+			//larger networks may need a merge sort.
 			if(this.policies.get(p).priority >= policy.priority){
 				//this keeps i to the correct positions to place new policy in
 				break;
@@ -588,8 +588,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 		}
 		
 		//Create a flow mod using the previous match structure
-		OFFlowMod fm = new OFFlowMod();
-		fm.setType(OFType.FLOW_MOD);
+		OFFlowMod fm = (OFFlowMod) floodlightProvider.getOFMessageFactory()
+                .getMessage(OFType.FLOW_MOD); 
 		//depending on the policy nw_tos or queue the flow mod
 		// will change the type of service bits or enqueue the packets
 		/**TODO**/ 

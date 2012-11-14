@@ -1,0 +1,62 @@
+#! /usr/bin/python
+#
+#QoSpusher.py ---------------------
+#Developed By: Ryan Wallner (ryan.wallner1@marist.edu)
+#Used add Types of Service i.e.(Best Effort) and Quality of Service policy’s to the network
+#Utilizes the QoS modules in BigSwitch Network's Floodlight Controller
+#
+##### USAGE ##########################################
+####################################################
+#			qos_pusher.py <add|delete>	<service|policy>	<service-object | policy object>
+# 		*note: if you are deleting you can just reference the name of the service/policy
+####################################################
+
+import sys
+import httplib      # basic HTTP library for HTTPS connections
+import urllib       # used for url-encoding during login request
+import simplejson   # converts between JSON and python objects
+
+def main():
+	#count one for 'qos_pusher.py'
+	if (len(sys.argv)) 	!= 4:
+		usage()
+	else if (sys.argv[1] == "--help")
+		usage_help()
+		
+	#Define the od variables for the request
+	cmd = sys.argv[1]
+	s_p = sys.argv[2]
+	obj = sys.argv[3]
+	
+#TODO
+	#http request
+	#add service
+	#del service
+	#add policy
+	#del policy
+	#write to json file
+	
+def use():
+	print "type 'qos_pusher.py --help' for more details"
+	print "qos_pusher.py <add|delete>	<service|policy>	<service-object | policy object>";
+def usage_help():
+	print '''QoSPusher.py
+						Author: Ryan Wallner (Ryan.Wallner1@marist.edu)
+						QoSPusher is a simple service and policy tool for Floodlight's Quality of Service Module
+						
+						To Add a service:
+							qos_pusher.py add service "{'name': 'Express Fowarding', 'tos': '101000'}"
+							
+						To Delete a service:
+							qos_pusher.py delete service "Express Fowarding"
+							
+						To Add a policy:
+							qos_pusher.py add policy "{}"
+							
+						To Delete a policy:
+							qos_pusher.py delete policy "{}"
+				 '''
+	
+#Call main
+if  __name__ == "__main__" :
+	main()

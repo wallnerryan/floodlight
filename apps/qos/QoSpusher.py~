@@ -1,0 +1,23 @@
+#! /usr/bin/python
+
+#QoSpusher.py ---------------------
+#Developed By: Ryan Wallner (ryan.wallner1@marist.edu)
+
+import sys
+import os
+
+def main():
+	try:
+		#get sys.argv[#'s]
+		#if less args then excpected
+		use()
+	except IOError:
+		print "Need to enter arguments"
+		use()
+
+def use():
+	print "Usage: ";
+	
+#Call main
+if  __name__ == "__main__" :
+	main()

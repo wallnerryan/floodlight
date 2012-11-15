@@ -66,7 +66,7 @@ def main():
 	  try:
 	   req = helper.request("POST",url,_json)
 	   print "[CONTROLLER]: %s" % req
-	   write("service",_json)
+	   #write("service",_json) #NEEDS WORK, SEE BELOW!
 	  except Exception as e:
 	   print e
 	   print "Could Not Complete Request"

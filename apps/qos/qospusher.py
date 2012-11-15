@@ -231,9 +231,9 @@ class httpHelper:
 	 return response.read()
 	
 def usage():
-	print "type 'qos_pusher.py --help' for more details"
-	print "qospusher.py <add|delete> <service|policy> <service-object | policy object> <controller-ip>";\
-	print "qospusher.py <enable|disable> <controller-ip>"
+	print '''type "qos_pusher.py --help" for more details
+	             qospusher.py <add|delete> <service|policy> <service-object | policy object> <controller-ip>
+	             qospusher.py <enable|disable> <controller-ip> '''
 def usage_help():
 	print '''
 	        ###################################

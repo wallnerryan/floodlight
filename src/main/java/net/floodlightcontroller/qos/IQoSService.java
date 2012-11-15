@@ -81,7 +81,7 @@ public interface IQoSService extends IFloodlightService {
     /**
      * Adds a QoS Policy
      */
-    public void addPolicy(QoSPolicy policy, long swid);
+    public void addPolicy(QoSPolicy policy, String swid);
 
     /**
      * Deletes a QoS Policy

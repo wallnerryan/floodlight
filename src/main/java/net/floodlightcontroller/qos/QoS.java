@@ -150,6 +150,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 		l.add(IFloodlightProviderService.class);
 		l.add(IStorageSourceService.class);
         l.add(IRestApiService.class);
+        l.add(IStaticFlowEntryPusherService.class);
 		return l;
 	}
 	
@@ -366,8 +367,10 @@ public class QoS implements IQoSService, IFloodlightModule,
 		logger.info("adding policy-flow {} to all switches",flow.toString());
 		//add to all switches
 		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
+		
 		//simple check
 		if(!(switches.isEmpty())){
+			// NEEDS OPTIMIZATION (push to context?)
 			for(IOFSwitch sw : switches.values()){
 				if(!(sw.isConnected())){
 					break;// cannot add
@@ -381,6 +384,21 @@ public class QoS implements IQoSService, IFloodlightModule,
 	}
 	
 	/**
+	 * Adds a policy to a switch (dpid)
+	 * @param QoSPolicy policy
+	 * @param String sw
+	 */
+	@Override
+	public void addPolicy(QoSPolicy policy, String swid) {
+		//Get the flowmod from a policy
+		OFFlowMod flow = policyToFlowMod(policy);
+		//debug
+		logger.info("adding policy-flow {} to all switches",flow.toString());
+		//add to all switches
+		flowPusher.addFlow(policy.name, flow, swid);
+	}
+	
+	/**
 	 * 
 	 * @param policy
 	 */
@@ -389,19 +407,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	
 	}
 	
-	/**
-	 * Adds a policy to a switch (dpid)
-	 * @param QoSPolicy policy
-	 * @param String sw
-	 */
-	@Override
-	public void addPolicy(QoSPolicy policy, long swid) {
-		//Get the flowmod from a policy
-		OFFlowMod flow = policyToFlowMod(policy);
-				
-		//debug
-		logger.info("adding flow {} to switch {}",flow.toString(), String.valueOf(swid));
-	}
 	
 	/**
 	 * Delete policy from a switch (dpid)
@@ -479,8 +484,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//
 		
 		//regex for dpid string, this can/needs to be more elegent. Maybe use of a Matcher
-		final String dpidPattern = "[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]" +
-				":[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]";
+		final String dpidPattern = "^[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]" +
+				":[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]$";
 		
 		if (policy.sw.equals("all")){
 			logger.debug("Adding Policy {} to Entire Network", policy.toString());
@@ -490,7 +495,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 		else if(policy.sw.matches(dpidPattern)){
 			logger.debug("Adding policy {} to switch {}", policy.toString(), policy.sw);
 			// add appropriate hex string converted to a long type
-			addPolicy(policy, HexString.toLong(policy.sw));
+			addPolicy(policy, policy.sw);
 			}	
 		else{
 			logger.error("***Policy {} error at switch input {} ***", policy.toString(), policy.sw);
@@ -588,8 +593,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 		}
 		
 		//Create a flow mod using the previous match structure
-		OFFlowMod fm = (OFFlowMod) floodlightProvider.getOFMessageFactory()
-                .getMessage(OFType.FLOW_MOD); 
+		OFFlowMod fm = new OFFlowMod();
+		fm.setType(OFType.FLOW_MOD);
 		//depending on the policy nw_tos or queue the flow mod
 		// will change the type of service bits or enqueue the packets
 		/**TODO**/ 
@@ -602,7 +607,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			enqueue.setType(OFActionType.OPAQUE_ENQUEUE); // I think this happens anyway in the constructor
 			enqueue.setPort(policy.enqueueport);
 			enqueue.setQueueId(policy.queue);
-			actions.add(enqueue);
+			actions.add((OFAction)enqueue);
 			
 			logger.info("Match is : {}", match.toString());
 			//add the matches and actions and return
@@ -611,7 +616,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 				.setIdleTimeout((short) 0)  // infinite
 				.setHardTimeout((short) 0)  // infinite
 				.setBufferId(OFPacketOut.BUFFER_ID_NONE)
-				.setCommand((short) 0)
 				.setFlags((short) 0)
 				.setOutPort(OFPort.OFPP_NONE.getValue())
 				.setPriority(policy.priority);
@@ -634,7 +638,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 				}
 			}
 			tosAction.setNetworkTypeOfService(pTos);
-			actions.add(tosAction);
+			actions.add((OFAction)tosAction);
 			
 			logger.info("Match is : {}", match.toString());
 			//add the matches and actions and return.class.ge
@@ -643,7 +647,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 				.setIdleTimeout((short) 0)  // infinite
 				.setHardTimeout((short) 0)  // infinite
 				.setBufferId(OFPacketOut.BUFFER_ID_NONE)
-				.setCommand((short) 0)
 				.setFlags((short) 0)
 				.setOutPort(OFPort.OFPP_NONE.getValue())
 				.setPriority(Short.MAX_VALUE);

@@ -95,7 +95,7 @@ public class QoSPoliciesResource extends ServerResource {
     			}else if(checkIfServiceExists(policy.service, qos.getServices())
     					&& policy.enqueueport == -1 && policy.queue == -1){
     				qos.addPolicy(policy);
-    			}else{status = "Policy must be defined as a Service policy or a Queuing Policy Only";}
+    			}else{status = "Service policy or a Queuing Policy not defined. Check is Service Exists";}
     		}
     		else{
     			status = "Please enable Quality of Service";

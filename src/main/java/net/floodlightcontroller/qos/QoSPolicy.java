@@ -138,8 +138,8 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
     result = prime * result + ipsrc;
     result = prime * result + (int) tos;
     result = prime * result + (int) vlanid;
-    result = prime * result + (int) HexString.toLong(ethsrc);
-    result = prime * result + (int) HexString.toLong(ethdst);
+    if(ethsrc != null){result = prime * result + (int) HexString.toLong(ethsrc);}
+    if(ethdst != null){result = prime * result + (int) HexString.toLong(ethdst);}
     result = prime * result + (int) tcpudpsrcport;
     result = prime * result + (int) tcpudpdstport;
     if(sw != null){result = prime * result + sw.hashCode();}

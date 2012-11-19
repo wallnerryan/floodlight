@@ -49,6 +49,7 @@ def main():
 	try:
 	 helper = httpHelper(__name="QoSHTTPHelper")
 	 print helper.get_attributes('__name')
+	 print "Trying to connect to %s..." % server
 	 helper.connect(server,8080)
 	except httplib.HTTPException:
 	 print "Error connecting to controller, please make sure you controller is running"
@@ -57,6 +58,7 @@ def main():
 	 print e
 	 print "Error connecting to controller"
 	 exit(1)
+	print "Connection Succesful"
 	
 	if cmd == "add":
 	 if s_p == "service":
@@ -174,10 +176,32 @@ def remove(op,name):
     newd.close()
     
 def enable(ip):
-	print "Enabling QoS at %s:%d" % (ip,8080)
-	#TODO
+	  helper = httpHelper(__name = "tmpHelper")
+	  helper.connect(ip,8080)
+	  print "Enabling QoS at %s:%d" % (ip,8080)
+	  url = "http://%s:%d/wm/qos/tool/enable/json" % (ip,8080)
+	  try:
+	   req = helper.request("GET",url,None)
+	   print "[CONTROLLER]: %s" % req
+	  except Exception as e:
+	   print e
+	   print "Could Not Complete Request"
+	   exit(1)
+	  helper.close_connection()
+	  
 def disable(ip):
-	print "Disabling QoS at %s:%d" % (ip,8080)
+	  helper = httpHelper(__name = "tmpHelper")
+	  helper.connect(ip,8080)
+	  print "Disabling QoS at %s:%d" % (ip,8080)
+	  url = "http://%s:%d/wm/qos/tool/disable/json" % (ip,8080)
+	  try:
+	   req = helper.request("GET",url,None)
+	   print "[CONTROLLER]: %s" % req
+	  except Exception as e:
+	   print e
+	   print "Could Not Complete Request"
+	   exit(1)
+	  helper.close_connection()
 	#TODO
 	
 class httpHelper:
@@ -232,8 +256,8 @@ class httpHelper:
 	
 def usage():
 	print '''type "qos_pusher.py --help" for more details
-	             qospusher.py <add|delete> <service|policy> <service-object | policy object> <controller-ip>
-	             qospusher.py <enable|disable> <controller-ip> '''
+	qospusher.py <add|delete> <service|policy> <service-object | policy object> <controller-ip>
+	qospusher.py <enable|disable> <controller-ip> '''
 def usage_help():
 	print '''
 	        ###################################

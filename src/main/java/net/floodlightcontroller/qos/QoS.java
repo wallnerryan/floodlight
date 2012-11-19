@@ -41,7 +41,6 @@ import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionEnqueue;
 import org.openflow.protocol.action.OFActionNetworkTypeOfService;
 import org.openflow.protocol.action.OFActionType;
-import org.openflow.util.HexString;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IOFMessageListener;
@@ -436,7 +435,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 		policy.policyid = policy.genID();
 		
 		int p = 0;
-		for (p = 0; p <= this.policies.size(); p++){
+		for (p = 0; p < this.policies.size(); p++){
 			//check if empy
 			if(this.policies.isEmpty()){
 				//p is zero
@@ -491,9 +490,12 @@ public class QoS implements IQoSService, IFloodlightModule,
 			logger.debug("Adding Policy {} to Entire Network", policy.toString());
 			addPolicyToNetwork(policy);
 		}
+		else if (policy.sw.equals("none")){
+			logger.debug("Adding Policy {} to Controller", policy.toString());
+		}
 		//add to a specified switch b/c "all" not specified
 		else if(policy.sw.matches(dpidPattern)){
-			logger.debug("Adding policy {} to switch {}", policy.toString(), policy.sw);
+			logger.debug("Adding policy {} to Switch {}", policy.toString(), policy.sw);
 			// add appropriate hex string converted to a long type
 			addPolicy(policy, policy.sw);
 			}	
@@ -604,6 +606,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			
 			//add the queuing action
 			OFActionEnqueue enqueue = new OFActionEnqueue();
+			enqueue.setLength((short) 0xffff);
 			enqueue.setType(OFActionType.OPAQUE_ENQUEUE); // I think this happens anyway in the constructor
 			enqueue.setPort(policy.enqueueport);
 			enqueue.setQueueId(policy.queue);
@@ -618,7 +621,9 @@ public class QoS implements IQoSService, IFloodlightModule,
 				.setBufferId(OFPacketOut.BUFFER_ID_NONE)
 				.setFlags((short) 0)
 				.setOutPort(OFPort.OFPP_NONE.getValue())
-				.setPriority(policy.priority);
+				.setPriority(policy.priority)
+				.setLengthU((short)OFFlowMod.MINIMUM_LENGTH + OFActionEnqueue.MINIMUM_LENGTH);
+				
 		}
 		else if(policy.queue == -1 && policy.service != null){
 			logger.info("This policy is a type of service policy");
@@ -627,6 +632,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			//add the queuing action
 			OFActionNetworkTypeOfService tosAction = new OFActionNetworkTypeOfService();
 			tosAction.setType(OFActionType.SET_NW_TOS);
+			tosAction.setLength((short) 0xffff);
 			
 			//Find the appropriate type of service bits in policy
 			Byte pTos = null;
@@ -649,7 +655,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 				.setBufferId(OFPacketOut.BUFFER_ID_NONE)
 				.setFlags((short) 0)
 				.setOutPort(OFPort.OFPP_NONE.getValue())
-				.setPriority(Short.MAX_VALUE);
+				.setPriority(Short.MAX_VALUE)
+				.setLengthU((short)OFFlowMod.MINIMUM_LENGTH + OFActionNetworkTypeOfService.MINIMUM_LENGTH);
 		}
 		else{
 			logger.error("Policy Misconfiguration");

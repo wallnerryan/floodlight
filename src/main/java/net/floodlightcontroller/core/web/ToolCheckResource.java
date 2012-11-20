@@ -49,18 +49,6 @@ public class ToolCheckResource extends ServerResource {
     					currentTool = tools[i];
     					is_enabled = prop.getProperty(tools[i]);
     					toolSet.put(currentTool, is_enabled);
-    					//System.out.println(is_enabled);
-    					if (is_enabled.equals("enabled")){
-    						//Enable the tools
-    						if (currentTool.equals("qos")){
-    							qos.enableQoS(true);
-    						}
-    						else if (currentTool.equals("firewall")){
-    							firewall.enableFirewall(true);
-    						}
-    							logger.debug("Tool {} enabled on startup", currentTool);
-    					}
-    					else{logger.debug("Tool {} is disabled on startup", currentTool);}
     				}
     			} catch (FileNotFoundException e) {
     				e.printStackTrace();
@@ -87,7 +75,6 @@ public class ToolCheckResource extends ServerResource {
     			this.getTools();
     		}
     	}
-    	
     	@Get("json")
         public ToolCheckInfo toolCheck() {
     		//return a simple list of tool for the webUI to get

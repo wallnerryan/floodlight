@@ -26,10 +26,14 @@ package net.floodlightcontroller.qos;
 *  
 **/
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
@@ -69,6 +73,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 	protected List<QoSTypeOfService> services;
 	protected IRestApiService restApi;
 	protected IStorageSourceService storageSource;
+	protected Properties props = new Properties();
+	protected String[] tools;
 	protected static Logger logger;
 	
 	public boolean enabled;
@@ -199,16 +205,20 @@ public class QoS implements IQoSService, IFloodlightModule,
         // start disabled
         // can be overridden by tools.properties.
         enabled = false;
-        
-        /** 
-         * 
-         * 
-         * 
-         * TODO check enabled from properties 
-         * 
-         * 
-         * 
-         * **/
+        try {
+			//load a properties file
+			props.load(new FileInputStream("src/main/resources/tools.properties"));
+			tools = props.getProperty("tools").split(",");
+			System.out.println(props.getProperty("qos"));
+			if(props.getProperty("qos").equalsIgnoreCase("enabled")){
+				logger.info("Enabling QoS on Start-up. Edit tools.properties to change this.");
+				this.enableQoS(true);
+			}
+        }catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch(IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	@Override
@@ -217,6 +227,8 @@ public class QoS implements IQoSService, IFloodlightModule,
         restApi.addRestletRoutable(new QoSWebRoutable());
         // start qos if enabled at bootup
         if (this.enabled == true) {
+        	//TODO
+        	//NOT NEEDED, BUT CAN DO SOMETHING INTERESTING
             floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
         }
         //debug
@@ -276,7 +288,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 */
 	@Override
 	public void enableQoS(boolean enable) {
-		logger.info("Setting QoS to {}", enabled);
+		logger.info("Setting QoS to {}", enable);
         this.enabled = enable;	
 	}
 	
@@ -360,13 +372,10 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 */
 	@Override
 	public void addPolicyToNetwork(QoSPolicy policy) {
-		//Get the flowmod from a policy
 		OFFlowMod flow = policyToFlowMod(policy);
-		//debug
 		logger.info("adding policy-flow {} to all switches",flow.toString());
 		//add to all switches
 		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
-		
 		//simple check
 		if(!(switches.isEmpty())){
 			// NEEDS OPTIMIZATION (push to context?)
@@ -389,10 +398,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 */
 	@Override
 	public void addPolicy(QoSPolicy policy, String swid) {
-		//Get the flowmod from a policy
 		OFFlowMod flow = policyToFlowMod(policy);
-		//debug
-		logger.info("adding policy-flow {} to all switches",flow.toString());
+		logger.info("Adding policy-flow {} to switch {}",flow.toString(),swid);
 		//add to all switches
 		flowPusher.addFlow(policy.name, flow, swid);
 	}
@@ -449,13 +456,11 @@ public class QoS implements IQoSService, IFloodlightModule,
 				break;
 			}
 		}
-
 		if (p <= this.policies.size()) {
 			this.policies.add(p, policy);
 			} else {
 				this.policies.add(policy);
 	        }	
-		
 		//Add to the storageSource
 		Map<String, Object> policyEntry = new HashMap<String, Object>();
 		policyEntry.put(COLUMN_POLID, Long.toString(policy.policyid));
@@ -478,9 +483,9 @@ public class QoS implements IQoSService, IFloodlightModule,
 		policyEntry.put(COLUMN_SERVICE, policy.service);
 		storageSource.insertRow(TABLE_NAME, policyEntry);
 		
-		//
-		//Possibly a place to add a list of switched to add to
-		//
+		/**
+		* Possibly a place to add a list of switches to add to
+		**/
 		
 		//regex for dpid string, this can/needs to be more elegent. Maybe use of a Matcher
 		final String dpidPattern = "^[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]" +

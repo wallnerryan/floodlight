@@ -24,15 +24,24 @@ window.Tool = Backbone.Model.extend({
         desc: "",
         enabled: false,
     },
+ 	initialize:function () {
+ 	 	var self = this;
+ 	 	this.services = new ServiceCollection();
+ 	 	getServices(this.services);
+ 	 	this.policies = new PolicyCollection();
+ 	 	getPolicies(this.policies);
+    },
 
+    fetch:function () {
+        this.initialize()
+    },
 });
-
 window.ToolCollection = Backbone.Collection.extend({
 
     model:Tool,
   
     initialize:function () {
-        // console.log('...Initializing Tools');
+        console.log('...Initializing Tools');
       	var self = this;
       	self.bind("change");
       	
@@ -43,13 +52,11 @@ window.ToolCollection = Backbone.Collection.extend({
             dataType:"json",
             success:function (data) {
                 console.log("fetched tools");
-                //console.log(data);
                 _.each(data["tools"], function(en,key){
                 	 var tool = new Object();
                 	 tool.name = key;
             		 tools.push(tool);
                 	});
-                	//console.log(tools);
       				var ntools = tools.length;
       				var count = 0;
       				_.each(tools, function(tool) {
@@ -97,11 +104,13 @@ window.ToolCollection = Backbone.Collection.extend({
           				self.add({toolName: t, toolId: count, restURI: uri, desc: desc, enabled: enabled, id: count});
           			   }
                      });
+                     self.trigger('add'); // batch redraws
+                     self.trigger('change');
                  }
         });
      },
      
-     fetch:function () {
+    fetch:function () {
         this.initialize()
     },
 });
@@ -131,4 +140,79 @@ function getStatus(toolName){
           });
         }
         return status;
-     }
+}
+     
+function getServices(srvs){
+		console.log("Loading Services..");
+     	var self = this;
+        $.ajax({
+            url:hackBase + "/wm/qos/service/json",
+            dataType:"json",
+            success:function (data) {
+               //console.log(data);
+                _.each(data, function(s){
+                	var service = new Object();
+                	service.sid = s["sid"]
+                	service.name = s["name"]
+                	service.tos = s["tos"] 
+                	//console.log(s);
+                	srvs.add({sid: service.sid, name: service.name, tos: service.tos});
+                });
+            }
+        });
+}
+
+function getPolicies(plcs){
+		console.log("Loading Policies..");
+     	var self = this;
+        $.ajax({
+            url:hackBase + "/wm/qos/policy/json",
+            dataType:"json",
+            success:function (data) {
+               //console.log(data);
+                _.each(data, function(p){
+                	var policy = new Object();
+                	policy.sid = p["policyid"]
+                	policy.name = p["name"]
+                	policy.ethtype = p["ethtype"]
+        			policy.protocol = p["protocol"]
+        			policy.ingressport = p["ingressport"]
+					policy.ipdst = p["ipdst"]
+					policy.ipsrc = p["ipsrc"]
+					policy.tos = p["tos"]
+					policy.vlanid = p["vlanid"]
+					policy.ethsrc = p["ethsrc"]
+					policy.ethdst = p["ethdst"]
+					policy.tcpudpdstport = p["tcpudpdstport"]
+					policy.tcpudpsrcport = p["tcpudpsrcport"]
+					policy.sw = p["sw"]
+					policy.queue = p["queue"]
+					policy.enqueueport = p["enqueueport"]
+					policy.service = p["service"]
+					policy.priority = p["priority"]
+					
+                	//console.log(p);
+                	plcs.add({sid: policy.sid,
+                			 name: policy.name,
+                			 ethtype: policy.ethtype,
+                			 protocol: policy.protocol,
+        					 ingressport: policy.ingressport,
+							 ipdst: policy.ipdst,
+							 ipsrc: policy.ipsrc,
+					  		 tos: policy.tos,
+							 vlanid: policy.vlanid,
+					  		 ethsrc: policy.ethsrc,
+							 ethdst: policy.ethdst,
+							 tcpudpdstport: policy.tcpudpdstport,
+							 tcpudpsrcport: policy.tcpudpsrcport,
+							 sw: policy.sw,
+							 queue: policy.queue,
+							 enqueueport: policy.enqueueport,
+							 service: policy.service,
+							 priority: policy.priority});
+                });
+            }
+        });
+}
+
+

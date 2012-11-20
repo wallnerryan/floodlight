@@ -20,21 +20,17 @@ window.ToolListView = Backbone.View.extend({
 			console.log('...Initializing Tools Page');
         	this.template = _.template(tpl.get('tools-list'));
         	this.model.bind("change", this.render, this);
-        	//this.model.bind("change", this.enabledChanged, this);
+        	this.model.bind("add", this.render, this);
+        	
     	},
 
 	render:function (eventName) {
        		$(this.el).html(this.template({ntools:tl.length}));
 			_.each(this.model.models, function (t) {
-				//console.log(t);
 				$(this.el).find('#tools > tbody:first-child').append(new ToolsListItemView({model:t}).render().el);
 			}, this);
 			return this;
 	},
-	
-	enabledChanged:function (){
-    	alert("something has changed");
-    },
 });
 
 window.ToolsListItemView = Backbone.View.extend({
@@ -44,7 +40,7 @@ window.ToolsListItemView = Backbone.View.extend({
 	initialize:function () {
         this.template = _.template(tpl.get('tools-list-item'));
         this.model.bind("change", this.render, this);
-        //this.model.bind("change", this.enabledChanged, this);
+        this.model.bind("destroy", this.render, this);
       },
       
     render:function () {
@@ -52,10 +48,6 @@ window.ToolsListItemView = Backbone.View.extend({
         return this;
     },
     
-    enabledChanged:function (){
-    	alert("something has changed");
-    },
-
 });
 
 
@@ -64,22 +56,32 @@ window.ToolDetailsView = Backbone.View.extend({
 	initialize:function () {
         this.template = _.template(tpl.get('tool'));
         this.model.bind("change", this.render, this);
-       	//this.model.bind("change", this.enabledChanged, this);
+        this.model.bind("add", this.render, this);
     },
     
     events:{
         "click #enable-button":"enableToolFunction",
         "click #disable-button":"disableToolFunction"
-        
+		//TODO add / remove qos policies
     },
 
-    render:function (eventName) {
+    render:function (event) {
         $(this.el).html(this.template(this.model.toJSON()));
-        return this;
-    },
-    
-    enabledChanged:function (){
-    	alert("something has changed");
+        if (!event) var event = window.event;
+    	if (event.target) targ = event.target;
+    	if(targ.name != null){
+        	//console.log(targ.name);
+        	if(targ.name == "Quality" || targ.name == 'quality of service'){
+        		$(this.el).find('#qos').show();
+         		//Services & Policies
+       	 		$(this.el).find('#services').html(new ServiceListView({model:this.model.services}).render().el);
+				$(this.el).find('#policies').html(new PolicyListView({model:this.model.policies}).render().el);
+			}
+			if(targ.name == "Firewall"){
+			console.log("Firewall specific load");
+			}
+		}
+		return this;
     },
     
     enableToolFunction:function (event){
@@ -170,3 +172,5 @@ window.ToolDetailsView = Backbone.View.extend({
     },
 
 });
+
+

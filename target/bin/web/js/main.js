@@ -109,8 +109,11 @@ var AppRouter = Backbone.Router.extend({
 var swl = new SwitchCollection();
 var hl  = new HostCollection();
 var tl = new ToolCollection();
+//var pl = new PolicyCollection();
+//var sl = new ServiceCollection();
 
-tpl.loadTemplates(['home', 'status', 'topology', 'header', 'switch', 'switch-list', 'switch-list-item', 'host', 'host-list', 'host-list-item', 'port-list', 'port-list-item', 'flow-list', 'flow-list-item', 'tools-list', 'tool', 'tools-list-item'],
+
+tpl.loadTemplates(['home', 'status', 'topology', 'header', 'switch', 'switch-list', 'switch-list-item', 'host', 'host-list', 'host-list-item', 'port-list', 'port-list-item', 'flow-list', 'flow-list-item', 'tools-list', 'tool', 'tools-list-item','service-list-item','service-list','policy-list-item', 'policy-list'],
     function () {
         app = new AppRouter();
         Backbone.history.start({pushState: true});
@@ -148,3 +151,4 @@ setInterval(function () {
 setInterval(function () {
     tl.fetch();
 }, 3000);
+

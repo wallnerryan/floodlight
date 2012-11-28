@@ -16,13 +16,8 @@ package net.floodlightcontroller.qos;
 *  License for the specific language governing permissions and limitations
 *  under the License.
 *    
-*  Provides Queuing and L2/L3 Quality of Service Policies to a 
-*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  This modules provides overlapping flowspace for policies that governed by their priority
-*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
-*  by existing "Policies" within a network.
-*  
-* code adopted from Firewall
+* Implementation adopted from Firewall
+* Credit To:
 * @author Amer Tahir
 * @edited KC Wang
 **/
@@ -49,7 +44,7 @@ public class QoSTypeOfService implements Comparable<QoSTypeOfService>{
      * @return int representing the unique id
      */
     public int genID() {
-        int uid = this.hashCode(); //need to create??
+        int uid = this.hashCode();
         if (uid < 0) {
             uid = Math.abs(uid);
             uid = uid * 15551;
@@ -75,13 +70,11 @@ public class QoSTypeOfService implements Comparable<QoSTypeOfService>{
 	 * @return
 	 */
 	public boolean isSameAs(QoSTypeOfService service){
-		//check if either the name of the service of the ToS bits match
-		if((this.name == service.name)
-				|| (this.tos == service.tos)){
+		//check if either the object, name or service ToS bits match
+		if(this.equals(service) || (this.name == service.name) || (this.tos == service.tos)){
 		return true;
 		}
 		else{
-			//if not, return false
 			return false;
 		}
 	}

@@ -16,13 +16,8 @@ package net.floodlightcontroller.qos;
 *  License for the specific language governing permissions and limitations
 *  under the License.
 *    
-*  Provides Queuing and L2/L3 Quality of Service Policies to a 
-*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  This modules provides overlapping flowspace for policies that governed by their priority
-*  as in the firewall flowspace. This QoS modules acts in a pro-active manner having to abide
-*  by existing "Policies" within a network.
-*  
-* code adopted from Firewall
+* Implementation adopted from Firewall
+* Credit To:
 * @author Amer Tahir
 * @edited KC Wang
 **/
@@ -48,7 +43,11 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	public short tcpudpsrcport;
 	public short tcpudpdstport;
 	
-	//Can be "all" or a "dpid"
+	//Can be "all", "dpid" or [TODO: list of "dpid,dpid"]
+	/**
+	 * TODO
+	 * public String sws;
+	 */
 	public String sw;
 	
 	//If it is queuing, must ignore ToS bits. and set "enqueue".
@@ -62,7 +61,7 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	//Defaulted Priority
 	public short priority = 0;
 	
-	// -1's are check in QoS.java: policyToFlowMod()
+	/** -1's are check in QoS.java: policyToFlowMod() **/
 	public QoSPolicy(){
 		this.policyid = 0;
 		this.name = null;
@@ -87,7 +86,6 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	
 	/**
      * Generates a unique ID for the instance
-     * 
      * @return int representing the unique id
      */
     public int genID() {
@@ -112,11 +110,11 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
     }
 	
 	/**
-	 * 
 	 * @param policy
 	 * @return
 	 */
 	public boolean isSameAs(QoSPolicy policy){
+		//check object and unique name of policy
 		if (this.equals(policy) || this.name.equals(policy.name)){
 			return true;
 		}
@@ -125,6 +123,9 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 		}
 	}
 	
+	/**
+	 * Override hashcode
+	 */
 	@Override
 	public int hashCode(){
 	final int prime = 2521;

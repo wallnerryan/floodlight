@@ -17,12 +17,16 @@ package net.floodlightcontroller.qos;
 *  under the License.
 *    
 *  Provides Queuing and L2/L3 Quality of Service Policies to a 
-*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  This modules provides overlapping flowspace for policies that governed by their priority
-*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
-*  by existing "Policies" within a network.
+*  virtualized network using DiffServ/ToS class based model, and queuing techniques.
+*  This module provides overlapping flowspace for policies that governed by their priority.
+*  This QoS modules acts in a pro-active manner having to abide by existing "Policies" 
+*  within a network.
 *  
-*  LIMITED: End-to-End policies are only supported for a single OF-Cluster
+*  
+*  Implementation adopted from Firewall
+*  Credit where credit is due:
+*  @author Amer Tahir
+*  @edited KC Wang
 *  
 **/
 
@@ -115,7 +119,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	
 	@Override
 	public String getName() {
-		return "qostool";
+		return "qos";
 	}
 
 	@Override
@@ -149,7 +153,9 @@ public class QoS implements IQoSService, IFloodlightModule,
 
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleDependencies() {
-		//This module should depend on FloodlightProviderService
+		//This module should depend on FloodlightProviderService,
+		// IStorageSourceProviderService, IRestApiService, &
+		// IStaticFlowEntryPusherService
 		Collection<Class<? extends IFloodlightService>> l =
 				new ArrayList<Class<? extends IFloodlightService>>();
 		l.add(IFloodlightProviderService.class);
@@ -160,9 +166,9 @@ public class QoS implements IQoSService, IFloodlightModule,
 	}
 	
 	/**
-     * Reads the policies from the storage and creates a sorted arraylist ofQoSPolicy
-     * from them.
-     * @return the sorted arraylist of Policy instances (rules from storage)
+     * Reads the policies from the storage and creates a sorted 
+     * ArrayList of QoSPolicy's from them.
+     * @return the sorted ArrayList of Policy instances (rules from storage)
      */
     protected ArrayList<QoSPolicy> readPoliciesFromStorage() {
         ArrayList<QoSPolicy> l = new ArrayList<QoSPolicy>();
@@ -175,9 +181,9 @@ public class QoS implements IQoSService, IFloodlightModule,
     }
     
     /**
-     * Reads the types of services from the storage and creates a sorted arraylist of QoSTypeOfService
-     * from them.
-     * @return the sorted arraylist of Type of Service instances (rules from storage)
+     * Reads the types of services from the storage and creates a 
+     * sorted ArrayList of QoSTypeOfService from them
+     * @return the sorted ArrayList of Type of Service instances (rules from storage)
      */
     protected ArrayList<QoSTypeOfService> readServicesFromStorage() {
         ArrayList<QoSTypeOfService> l = new ArrayList<QoSTypeOfService>();
@@ -192,7 +198,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	@Override
 	public void init(FloodlightModuleContext context)
 			throws FloodlightModuleException {
-		
 		//initiate services
 		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 		flowPusher = context.getServiceImpl(IStaticFlowEntryPusherService.class);
@@ -202,6 +207,7 @@ public class QoS implements IQoSService, IFloodlightModule,
         policies = new ArrayList<QoSPolicy>();
         services = new ArrayList<QoSTypeOfService>();
         logger = LoggerFactory.getLogger(QoS.class);
+        
         // start disabled
         // can be overridden by tools.properties.
         enabled = false;
@@ -225,14 +231,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public void startUp(FloodlightModuleContext context) {
 		// initialize REST interface
         restApi.addRestletRoutable(new QoSWebRoutable());
-        // start qos if enabled at bootup
-        if (this.enabled == true) {
-        	//TODO
-        	//NOT NEEDED, BUT CAN DO SOMETHING INTERESTING
-            floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
-        }
-        //debug
-        logger.debug("Creating QoS tables");
         
         //Storage for policies
         storageSource.createTable(TABLE_NAME, null);
@@ -263,25 +261,30 @@ public class QoS implements IQoSService, IFloodlightModule,
 			IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		
 		// do not process packet if not enabled
-		if (!this.enabled) return Command.CONTINUE;
-		
+		if (!this.enabled) {
+			return Command.CONTINUE;
+		}
+		//Listen for Packets that match Policies
 		switch (msg.getType()) {
-        case FLOW_MOD:
+        case PACKET_IN:
+        	byte[] packetData = OFMessage.getData(sw, msg, cntx);
+        	//Temporary match from packet to compare
+        	OFMatch tmpMatch = new OFMatch();
+        	tmpMatch.loadFromPacket(packetData, OFPort.OFPP_NONE.getValue());
+        	
+        	try{
+        		checkIfQoSApplied(tmpMatch);
+        	}catch(IOException e){
+        		logger.error("Error processing packet, Error: {}", e);
+        	}
+        	
             break;
         default:
             return Command.CONTINUE;
         }
-		// if the flowmod is a policy
-		//************************************
-		//************************************
-		// Perform matching on policies, output "getting QoS, rulname, ToS or Queue
-		// logger recieving <types of qos> qos in this network
-		//************************************
-		//************************************
-		
 		return Command.CONTINUE;
 	}
-	
+
 	/**
 	 * Allow access to enable module
 	 * @param boolean
@@ -306,6 +309,17 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public List<QoSPolicy> getPolicies() {
 		return this.policies;
 	}
+	
+	/**
+	 * Returns a list of services available for Network Type of Service
+	 * @return List
+	 */
+	@Override
+	public List<QoSTypeOfService> getServices() {
+		return this.services;
+	}
+
+	
 	/**
 	 * Add a service class to use in policies
 	 * Used to make ToS/DiffServ Bits human readable. 
@@ -345,16 +359,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 	}
 	
 	/**
-	 * Returns a list of services available for Network Type of Service
-	 * @return List
-	 */
-	
-	@Override
-	public List<QoSTypeOfService> getServices() {
-		return this.services;
-	}
-
-	/**
 	 * Removes a Network Type of Service
 	 */
 	@Override
@@ -366,68 +370,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 		**/
 	}
 	
-	/**
-	 * Add a policy-flowMod to all switches in network
-	 * @param policy
-	 */
-	@Override
-	public void addPolicyToNetwork(QoSPolicy policy) {
-		OFFlowMod flow = policyToFlowMod(policy);
-		logger.info("adding policy-flow {} to all switches",flow.toString());
-		//add to all switches
-		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
-		//simple check
-		if(!(switches.isEmpty())){
-			// NEEDS OPTIMIZATION (push to context?)
-			for(IOFSwitch sw : switches.values()){
-				if(!(sw.isConnected())){
-					break;// cannot add
-				}
-				//logger.info("Switch : {} DPID : {}",sw.getStringId(), sw.getId());
-				logger.info("Add flow Name: {} Flow: {} Switch "+ sw.getStringId(), 
-				policy.name, flow.toString());
-				flowPusher.addFlow(policy.name, flow, sw.getStringId());	
-			}
-		}
-	}
-	
-	/**
-	 * Adds a policy to a switch (dpid)
-	 * @param QoSPolicy policy
-	 * @param String sw
-	 */
-	@Override
-	public void addPolicy(QoSPolicy policy, String swid) {
-		OFFlowMod flow = policyToFlowMod(policy);
-		logger.info("Adding policy-flow {} to switch {}",flow.toString(),swid);
-		//add to all switches
-		flowPusher.addFlow(policy.name, flow, swid);
-	}
-	
-	/**
-	 * 
-	 * @param policy
-	 */
-	@Override
-	public void deletePolicyFromNetwork(QoSPolicy policy) {
-	
-	}
-	
-	
-	/**
-	 * Delete policy from a switch (dpid)
-	 * @param policyid
-	 * @param sw
-	 */
-	@Override
-	public void deletePolicy(int policyid, long swid) {
-		/**
-		// TODO Auto-generated method stub
-		* called by web routable if delete -> sw dpid
-		* removes policy from list and storage
-		* removes all flows that match the policy
-		**/
-	}
 	
 	/** Adds a policy to all switches
 	 * 	Called when sws = "all"
@@ -509,6 +451,53 @@ public class QoS implements IQoSService, IFloodlightModule,
 		}
 	}
 	
+	/**
+	 * Add a policy-flowMod to all switches in network
+	 * @param policy
+	 */
+	@Override
+	public void addPolicyToNetwork(QoSPolicy policy) {
+		OFFlowMod flow = policyToFlowMod(policy);
+		logger.info("adding policy-flow {} to all switches",flow.toString());
+		//add to all switches
+		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
+		//simple check
+		if(!(switches.isEmpty())){
+			// NEEDS OPTIMIZATION (push to context?)
+			for(IOFSwitch sw : switches.values()){
+				if(!(sw.isConnected())){
+					break;// cannot add
+				}
+				//logger.info("Switch : {} DPID : {}",sw.getStringId(), sw.getId());
+				logger.info("Add flow Name: {} Flow: {} Switch "+ sw.getStringId(), 
+				policy.name, flow.toString());
+				flowPusher.addFlow(policy.name, flow, sw.getStringId());	
+			}
+		}
+	}
+	
+	/**
+	 * Adds a policy to a switch (dpid)
+	 * @param QoSPolicy policy
+	 * @param String sw
+	 */
+	@Override
+	public void addPolicy(QoSPolicy policy, String swid) {
+		OFFlowMod flow = policyToFlowMod(policy);
+		logger.info("Adding policy-flow {} to switch {}",flow.toString(),swid);
+		//add to all switches
+		flowPusher.addFlow(policy.name, flow, swid);
+	}
+	
+	/**
+	 * Removes a policiy from entire network
+	 * @param policy
+	 */
+	@Override
+	public void deletePolicyFromNetwork(QoSPolicy policy) {
+	
+	}
+	
 	/** Deletes a policy
 	 *  @author wallnerryan
 	 *  @overloaded
@@ -529,6 +518,22 @@ public class QoS implements IQoSService, IFloodlightModule,
 		//either way removes from list b/c sw policy's have a single flow instance
 		//deletePolicy(id, swid) or deletePolicyFromNetwork
 	}
+	
+	/**
+	 * Delete policy from a switch (dpid)
+	 * @param policyid
+	 * @param sw
+	 */
+	@Override
+	public void deletePolicy(int policyid, long swid) {
+		/**
+		// TODO Auto-generated method stub
+		* called by web routable if delete -> sw dpid
+		* removes policy from list and storage
+		* removes all flows that match the policy
+		**/
+	}
+	
 	
 	/**
 	 * Returns a flowmod from a policy
@@ -667,5 +672,23 @@ public class QoS implements IQoSService, IFloodlightModule,
 			logger.error("Policy Misconfiguration");
 		}
 	return fm;	
+	}
+	
+	/**
+	 * 
+	 * @param tmpMatch
+	 * @throws IOException
+	 */
+	private void checkIfQoSApplied(OFMatch tmpMatch) throws IOException {
+		
+		/**
+		 * TODO
+		 * check match strcucture against policies,
+		 * for every policy, you can use policyToFlowMod
+		 * and check match structure against the passed OFMatch
+		 * if they match, log information about what QoS is applied
+		 * to that type of packet.
+		 */
+		
 	}
 }

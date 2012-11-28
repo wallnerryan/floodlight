@@ -31,23 +31,20 @@ import org.slf4j.LoggerFactory;
 *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 *  License for the specific language governing permissions and limitations
 *  under the License.
-*    
-*  Provides Queuing and L2/L3 Quality of Service Policies to a 
-*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  This modules provides overlapping flowspace for policies that governed by their priority
-*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
-*  by existing "Policies" within a network.
-*  
- * 
- * code adopted from Firewall
- * @author Amer Tahir
- * @edited KC Wang
- */
+* 
+* Implementation adopted from Firewall
+* Credit where credit is due:
+* @author Amer Tahir
+* @edited KC Wang
+*/
 
 public class QoSTypeOfServiceResource extends ServerResource {
 	public static Logger logger = LoggerFactory.getLogger(QoSTypeOfServiceResource.class);
 	
-	
+	/**
+	 * Get list of services
+	 * @return
+	 */
 	@Get("json")
 	public Object handleRequest(){
 		IQoSService qos = 
@@ -74,9 +71,9 @@ public class QoSTypeOfServiceResource extends ServerResource {
     		service = jsonToService(tosJson);
     	}
     	catch(IOException e){
-    		logger.debug("Error Parsing Quality of Service to JSON: {}, Error: {}", tosJson, e);
+    		logger.debug("Error Parsing QoS Service to JSON: {}, Error: {}", tosJson, e);
     		e.printStackTrace();
-    		return "{\"status\" : \"Error! Could not parse service, see log for details.\"}";
+    		return "{\"status\" : \"Error! Could not parse Service, see log for details.\"}";
     	}
     	String status = null;
     	if(checkIfServiceExists(service,qos.getServices())){
@@ -86,7 +83,7 @@ public class QoSTypeOfServiceResource extends ServerResource {
     	else{
     		//Only add if enabled ?needed?
     		if(qos.isEnabled()){
-    			status = "Trying to add Type Of Service: " + service.name + " " + service.tos;//add service
+    			status = "Adding Type Of Service: " + service.name + " " + service.tos;
     			qos.addService(service);	
     		}
     		else{
@@ -96,15 +93,46 @@ public class QoSTypeOfServiceResource extends ServerResource {
     	return ("{\"status\" : \"" + status + "\"}");
     }
     
-    //******************
-    //******************
-    //TODO
-    //******************
-    //******************
+   /**
+    * 
+    * @param tosJson
+    * @return
+    */
     @Delete
     public String delete(String tosJson) {
+    	IQoSService qos = 
+    			(IQoSService)getContext().getAttributes().
+    			get(IQoSService.class.getCanonicalName());
     	
+    	//dummy service
+    	QoSTypeOfService service;
+    	
+    	//Accepts just "name": "<Service-Name>"
+    	//or the full service object
+    	try{
+    		service = jsonToService(tosJson);
+    	}
+    	catch(IOException e){
+    		logger.debug("Error Parsing QoS Service to JSON: {}, Error: {}", tosJson, e);
+    		e.printStackTrace();
+    		return "{\"status\" : \"Error! Could not parse Service, see log for details.\"}";
+    	}
     	String status = null;
+    	boolean exists = false;
+    	
+    	/**
+    	 * Check if sid is given look for it, 
+    	 * else if not, it is -1 ,
+    	 * use the name of the service to get sid.
+    	 * remove based on sid.
+    	 * exists = true
+    	 * 
+    	 * if Exists
+    	 * 
+    	 * deleteService(sid);
+    	 * status = rule deleted!
+    	 */
+    	
     	status = "Type Of Service Deleted";
     	return ("{\"status\" : \"" + status + "\"}");
     }
@@ -153,11 +181,10 @@ public class QoSTypeOfServiceResource extends ServerResource {
     				continue;
     			}
     		
-    			//user does not have to specify but can, wont really matter
-    			//when it becomes stored it will get a different uid
-    			//Referenc QoS.java:381
+    			//user only needs to specify with remove
+    			//when it becomes stored it will get a different id
+    			//Reference QoS.java:381
     			if(s == "sid"){
-    				//service.sid = Integer.parseInt((String)jp.getText());
     				service.sid = Integer.parseInt(jp.getText());
     			}
     			else if(s == "name"){
@@ -203,7 +230,7 @@ public class QoSTypeOfServiceResource extends ServerResource {
     	while(iter.hasNext()){
     		QoSTypeOfService s = iter.next();
     		//catch if entire service is same or name or bits
-    		if(service.isSameAs(s) ||service.name.equals(s.name) || service.equals(s.tos) ){
+    		if(service.isSameAs(s) || service.name.equals(s.name) || service.equals(s.tos) ){
     			return true;
     		}
     	}

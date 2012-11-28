@@ -16,12 +16,6 @@ package net.floodlightcontroller.qos;
 *  License for the specific language governing permissions and limitations
 *  under the License.
 *    
-*  Provides Queuing and L2/L3 Quality of Service Policies to a 
-*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  This modules provides overlapping flowspace for policies that governed by their priority
-*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
-*  by existing "Policies" within a network.
-*  
 *
 **/
 

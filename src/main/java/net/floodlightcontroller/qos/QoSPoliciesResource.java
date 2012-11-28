@@ -16,12 +16,11 @@ package net.floodlightcontroller.qos;
 *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 *  License for the specific language governing permissions and limitations
 *  under the License.
-*    
-*  Provides Queuing and L2/L3 Quality of Service Policies to a 
-*  Virtualized Network using DiffServ class based model, and certain OVS queuing techniques
-*  This modules provides overlapping flowspace for policies that governed by their priority
-*  as in the firewall flowspace. This QoS modules acts in a proactive manner haveing to abide
-*  by existing "Policies" within a network.
+*
+* Implementation adopted from Firewall
+* Credit where credit is due:
+* @author Amer Tahir
+* @edited KC Wang
 *
 **/
 
@@ -76,7 +75,7 @@ public class QoSPoliciesResource extends ServerResource {
     	catch(IOException e){
     		logger.error("Error Parsing Quality of Service Policy to JSON: {}, Error: {}", qosJson, e);
     		e.printStackTrace();
-    		return "{\"status\" : \"Error! Could not parse polocy, see log for details.\"}";
+    		return "{\"status\" : \"Error! Could not parse policy, see log for details.\"}";
     	}
     	String status = null;
     	if(checkIfPolicyExists(policy,qos.getPolicies())){
@@ -88,14 +87,14 @@ public class QoSPoliciesResource extends ServerResource {
     		if(qos.isEnabled()){
     			/**NOTE: the check for how its added happens 
 				 * inside addPolicy:(AROUND QoS.java:467)**/
-    			status = "Trying to Policy: " + policy.name;//add service
+    			status = "Adding Policy: " + policy.name;//add service
     			//basic checks on validity
     			if(policy.service == null && policy.enqueueport != -1 && policy.queue != -1){
     				qos.addPolicy(policy);
     			}else if(checkIfServiceExists(policy.service, qos.getServices())
     					&& policy.enqueueport == -1 && policy.queue == -1){
     				qos.addPolicy(policy);
-    			}else{status = "Service policy or a Queuing Policy not defined. Check is Service Exists";}
+    			}else{status = "Service Policy or a Queuing Policy not defined. Check is Service Exists";}
     		}
     		else{
     			status = "Please enable Quality of Service";
@@ -104,14 +103,29 @@ public class QoSPoliciesResource extends ServerResource {
     	return ("{\"status\" : \"" + status + "\"}");
     }
     
+    /**
+     * Deletes a policy
+     * @param qosJson
+     * @return status
+     **/
     @Delete
     public String delete(String qosJson) {
+    	
+    	/**
+    	 * TODO
+    	 */
     	
     	String status = null;
     	status = "Policy Deleted";
     	return ("{\"status\" : \"" + status + "\"}");
     }
     
+    /**
+     * Turns POST json data into policy
+     * @param pJson
+     * @return
+     * @throws IOException
+     */
     public static QoSPolicy jsonToPolicy(String pJson) throws IOException{
 		QoSPolicy policy = new QoSPolicy();
 		//initialize needs json tools
@@ -123,9 +137,6 @@ public class QoSPoliciesResource extends ServerResource {
 		}catch(JsonParseException e){
 			throw new IOException(e);
 		}
-		//debug for dev
-    	logger.info("JSON Object POSTED is " +jp.toString());
-    	
     	JsonToken tkn = jp.getCurrentToken();
     	if(tkn != JsonToken.START_OBJECT){
     		jp.nextToken();
@@ -136,11 +147,6 @@ public class QoSPoliciesResource extends ServerResource {
     	}
     	//If START_OBJECT
     	while(jp.nextToken() != JsonToken.END_OBJECT){
-    		//make sure current token is FIELD_OBJECT
-    		//if not throw error
-    		//create temp string == jp.getCurrentName
-    		//check for each name, "name":"value" pairs and store in policy.
-    		//make sure to parse non strings 
     		if(jp.getCurrentToken() != JsonToken.FIELD_NAME){
     			throw new IOException("FIELD_NAME expected");
     		}
@@ -161,33 +167,35 @@ public class QoSPoliciesResource extends ServerResource {
     			//Could use switch if JRE 1.7 compliant
     			//using if else for now
     			if (tmpS == "name"){
-    				policy.name = jp.getText();
-    				logger.info("[JSON PARSER]Policy Name: {}" , jp.getText());	
+    					policy.name = jp.getText();
+    					//logger.info("[JSON PARSER]Policy Name: {}" , jp.getText());	
     			}
     			else if(tmpS == "protocol"){
     				// i.e "protocol": "6"
     				policy.protocol = Byte.parseByte(jp.getText());
-    				logger.info("[JSON PARSER]Policy Protocol: {}", jp.getText());	
+    				//logger.info("[JSON PARSER]Policy Protocol: {}", jp.getText());	
     			}
     			else if(tmpS == "eth-type"){
-    				// i.e "eth-type":"0x0800"
+    				// i.e if "eth-type":"0x0800"
 					if (jp.getText().startsWith("0x")) {
 						policy.ethtype = U16.t(Integer.valueOf
 								(jp.getText().replaceFirst("0x",""),16));
 					}
-    				logger.info("[JSON PARSER]Policy Eth-type: {}", jp.getText());	
+					//return the short value of number i.e 8
+					else{policy.ethtype = (short) Integer.parseInt(jp.getText());}
+    				//logger.info("[JSON PARSER]Policy Eth-type: {}", jp.getText());	
     			}
     			else if(tmpS == "ingress-port"){
     				policy.ingressport = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy Ingress-Port: {}", jp.getText());	
+    				//logger.info("[JSON PARSER]Policy Ingress-Port: {}", jp.getText());	
     			}
     			else if(tmpS == "ip-src"){
     				policy.ipsrc = IPv4.toIPv4Address(jp.getText());
-    				logger.info("[JSON PARSER]Policy IP-Src: {}", IPv4.fromIPv4Address(policy.ipsrc));
+    				//logger.info("[JSON PARSER]Policy IP-Src: {}", IPv4.fromIPv4Address(policy.ipsrc));
     			}
     			else if(tmpS == "ip-dst"){
     				policy.ipdst = IPv4.toIPv4Address(jp.getText());
-    				logger.info("[JSON PARSER]Policy IP-Dst: {}", IPv4.fromIPv4Address(policy.ipdst));		
+    				//logger.info("[JSON PARSER]Policy IP-Dst: {}", IPv4.fromIPv4Address(policy.ipdst));		
     			}
     			else if(tmpS == "tos"){
     				//This is so you can enter a binary number or a integer number.
@@ -197,52 +205,52 @@ public class QoSPoliciesResource extends ServerResource {
     					Integer tmpInt = Integer.parseInt(jp.getText(),2);
     					policy.tos = tmpInt.byteValue();
     				}catch(NumberFormatException e){
-    					logger.debug("Number entered was not binary, processing as int...");
+    					//logger.debug("Number entered was not binary, processing as int...");
     					//Must be entered as 0-64
     					Integer tmpInt = Integer.parseInt(jp.getText());
     					policy.tos = tmpInt.byteValue();
     				}
-    				logger.info("[JSON PARSER]Policy TOS Bits: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy TOS Bits: {}", jp.getText());
     			}
     			else if(tmpS == "vlan-id"){
     				policy.vlanid = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy VLAN-ID: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy VLAN-ID: {}", jp.getText());
     			}
     			else if(tmpS == "eth-src"){
     				policy.ethsrc = jp.getText();
-    				logger.info("[JSON PARSER]Policy Eth-src: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy Eth-src: {}", jp.getText());
     			}
     			else if(tmpS == "eth-dst"){
     				policy.ethdst = jp.getText();
-    				logger.info("[JSON PARSER]Policy Eth-dst: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy Eth-dst: {}", jp.getText());
     			}
     			else if(tmpS == "src-port"){
     				policy.tcpudpsrcport = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy Src-Port: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy Src-Port: {}", jp.getText());
     			}
     			else if(tmpS == "dst-port"){
     				policy.tcpudpdstport = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy Dst-Port: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy Dst-Port: {}", jp.getText());
     			}		
     			else if(tmpS == "sw"){
     				policy.sw = jp.getText();
-    				logger.info("[JSON PARSER]Policy Switch: {}", jp.getText());	
+    				//logger.info("[JSON PARSER]Policy Switch: {}", jp.getText());	
     			}
     			else if(tmpS == "queue"){
     				policy.queue = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy QUEUE: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy QUEUE: {}", jp.getText());
     			}
     			else if(tmpS == "enqueue-port"){
     				policy.enqueueport = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy ENQUEUE-PORT: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy ENQUEUE-PORT: {}", jp.getText());
     			}
     			else if(tmpS == "service"){
     				policy.service = jp.getText();
-    				logger.info("[JSON PARSER]Policy Service: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy Service: {}", jp.getText());
     			}		
     			else if(tmpS == "priority"){
     				policy.priority = Short.parseShort(jp.getText());
-    				logger.info("[JSON PARSER]Policy Priority: {}", jp.getText());
+    				//logger.info("[JSON PARSER]Policy Priority: {}", jp.getText());
     			}
     			
     		}catch(JsonParseException e){
@@ -274,7 +282,8 @@ public class QoSPoliciesResource extends ServerResource {
 	}
     
     /**
-     * 
+     * Needed for when ToS Policies define a Service.
+     * Needs to be checked. See Line 94
      * @param service
      * @param services
      * @return

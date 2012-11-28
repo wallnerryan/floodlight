@@ -1,5 +1,26 @@
 package net.floodlightcontroller.core.web;
 
+/**
+* Copyright 2012 Marist College, New York
+* Author Ryan Wallner (ryan.wallner1@marist.edu)
+* 
+*  Licensed under the Apache License, Version 2.0 (the "License"); you may
+*  not use this file except in compliance with the License. You may obtain
+*  a copy of the License at
+*
+*         http://www.apache.org/licenses/LICENSE-2.0
+*
+*  Unless required by applicable law or agreed to in writing, software
+*  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+*  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+*  License for the specific language governing permissions and limitations
+*  under the License.
+*  
+*  Provides a way of knowing which tools are enabled/available on the controller
+*  Information provided by the tools.properties file.
+*    
+**/
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -27,7 +48,6 @@ public class ToolCheckResource extends ServerResource {
     		protected String[] tools;
     		protected String is_enabled;
     		protected String currentTool;
-    		protected String toolName;
     		    		
     		public HashMap<String,String> getTools(){
     			HashMap<String,String> toolSet = 
@@ -36,14 +56,7 @@ public class ToolCheckResource extends ServerResource {
     				//load a properties file
     				prop.load(new FileInputStream("src/main/resources/tools.properties"));
     				tools = prop.getProperty("tools").split(",");
-			
-    				
-    				/** Feature request: add the turn on on start-up properties
-    				 *  to the init function of the tool using the getName() functions
-    				 *  as the name of the tool, use this name for the properties
-    				 *  file too. **/
-    				
-    				//Return tools
+    				//Return tools  from props
     				for (int i=0; i<tools.length; i++){
     					//Tool information from properties file
     					currentTool = tools[i];
@@ -55,7 +68,7 @@ public class ToolCheckResource extends ServerResource {
     			} catch(IOException e) {
     				e.printStackTrace();
     			}
-    			logger.debug("Toolset is {}",toolSet);
+    			logger.debug("Toolset is: {}",toolSet);
     			return toolSet;
     		}
     	

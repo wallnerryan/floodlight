@@ -46,8 +46,8 @@ public class QoSTypeOfService implements Comparable<QoSTypeOfService>{
     public int genID() {
         int uid = this.hashCode();
         if (uid < 0) {
-            uid = Math.abs(uid);
             uid = uid * 15551;
+            uid = Math.abs(uid);
         }
         return uid;
     }

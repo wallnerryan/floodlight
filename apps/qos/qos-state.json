@@ -1,8 +1,10 @@
 {
-   "services": [],
-   "policies": [
-      " {\"name\": \"Enqueue 1:2 s2\", \"protocol\":\"6\",\"eth-type\": \"0x0800\", \"ingress-port\": \"1\",\"ip-src\":\"10.0.0.1\", \"sw\": \"00:00:00:00:00:00:00:02\",\"queue\":\"2\",\"enqueue-port\":\"1\"}",
-      " {\"name\": \"Enqueue 2:2 s1\", \"protocol\":\"6\",\"eth-type\": \"0x0800\", \"ingress-port\": \"1\",\"ip-src\":\"10.0.0.1\", \"sw\": \"00:00:00:00:00:00:00:01\",\"queue\":\"2\",\"enqueue-port\":\"2\"}",
-      " {\"name\": \"Enqueue 1:2 s2\", \"protocol\":\"6\",\"eth-type\": \"0x0800\", \"ingress-port\": \"1\",\"ip-src\":\"10.0.0.1\", \"sw\": \"00:00:00:00:00:00:00:02\",\"queue\":\"2\",\"enqueue-port\":\"1\"}"
-   ]
+   "services": [
+      {
+         "tos": "101000",
+         "name": "Express Fowarding",
+         "datetime": "Thu Dec 13 14:00:19 2012"
+      }
+   ],
+   "policies": []
 }

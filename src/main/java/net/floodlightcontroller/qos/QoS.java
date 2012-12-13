@@ -22,19 +22,15 @@ package net.floodlightcontroller.qos;
 *  This QoS modules acts in a pro-active manner having to abide by existing "Policies" 
 *  within a network.
 *  
-*  
-*  Implementation adopted from Firewall
-*  Credit where credit is due:
-*  @author Amer Tahir
-*  @edited KC Wang
-*  
 **/
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -49,6 +45,7 @@ import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionEnqueue;
 import org.openflow.protocol.action.OFActionNetworkTypeOfService;
 import org.openflow.protocol.action.OFActionType;
+import org.openflow.util.HexString;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IOFMessageListener;
@@ -59,7 +56,9 @@ import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
+import net.floodlightcontroller.storage.IResultSet;
 import net.floodlightcontroller.storage.IStorageSourceService;
+import net.floodlightcontroller.storage.StorageException;
 import net.floodlightcontroller.qos.QoSPolicy;
 import net.floodlightcontroller.qos.QoSTypeOfService;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -73,15 +72,21 @@ public class QoS implements IQoSService, IFloodlightModule,
 	
 	protected IFloodlightProviderService floodlightProvider;
 	protected IStaticFlowEntryPusherService flowPusher;
-	protected List<QoSPolicy> policies;
-	protected List<QoSTypeOfService> services;
+	protected List<QoSPolicy> policies; //Synchronized 
+	protected List<QoSTypeOfService> services; //Synchronized
 	protected IRestApiService restApi;
+	protected FloodlightContext cntx;
 	protected IStorageSourceService storageSource;
 	protected Properties props = new Properties();
 	protected String[] tools;
 	protected static Logger logger;
 	
-	public boolean enabled;
+	protected boolean enabled;
+	//regex for dpid string, this can/needs to be more elegant. Maybe use of a Matcher
+	protected String dpidPattern = "^[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:" +
+										"[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:" +
+										"[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:" +
+										"[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]$";
 	
 	public static final String TABLE_NAME = "controller_qos";
 	public static final String COLUMN_POLID = "policyid";
@@ -97,7 +102,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public static final String COLUMN_MATCH_TCPUDP_SRCPRT = "tcpudpsrcport";
 	public static final String COLUMN_MATCH_TCPUDP_DSTPRT = "tcpudpdstport";
 	public static final String COLUMN_NW_TOS = "nw_tos";
-	public static final String COLUMN_SW = "switche";
+	public static final String COLUMN_SW = "switches";
 	public static final String COLUMN_QUEUE = "queue";
 	public static final String COLUMN_ENQPORT = "equeueport";
 	public static final String COLUMN_PRIORITY = "priority";
@@ -169,14 +174,124 @@ public class QoS implements IQoSService, IFloodlightModule,
      * Reads the policies from the storage and creates a sorted 
      * ArrayList of QoSPolicy's from them.
      * @return the sorted ArrayList of Policy instances (rules from storage)
+     * 
+     *  Based on work from below, Credit to
+     *  @author Amer Tahir
+     *  @edited KC Wang
+     *  @author (re-authored) Ryan Wallner 
      */
     protected ArrayList<QoSPolicy> readPoliciesFromStorage() {
         ArrayList<QoSPolicy> l = new ArrayList<QoSPolicy>();
-        // *****************************************
-        // *****************************************
-        //TODO 
-        // *****************************************
-        // *****************************************
+        try{
+        	Map<String, Object> row;
+
+        	IResultSet policySet = storageSource
+        			.executeQuery(TABLE_NAME, ColumnNames, null, null );
+        	for( Iterator<IResultSet> iter = policySet.iterator(); iter.hasNext();){
+        		row = iter.next().getRow();
+        		
+        		QoSPolicy p = new QoSPolicy();
+        		if(!row.containsKey(COLUMN_POLID) 
+        				|| !row.containsKey(COLUMN_SW)
+        				|| !row.containsKey(COLUMN_QUEUE)
+        				|| !row.containsKey(COLUMN_ENQPORT)
+        				|| !row.containsKey(COLUMN_SERVICE)){
+        			logger.error("Skipping entry with required fields {}", row);
+        			continue;
+        		}
+        		
+        		try{
+        			p.policyid = Integer.parseInt((String) row.get(COLUMN_POLID));
+        			p.queue = Short.parseShort((String) row.get(COLUMN_QUEUE));
+        			p.enqueueport = Short.parseShort((String) row.get(COLUMN_ENQPORT));
+        			p.service = (String) row.get(COLUMN_SERVICE);
+        			
+        			//TODO change for String[] of switches
+        			p.sw = (String) row.get(COLUMN_SW);
+        			
+        			for(String key: row.keySet()){
+        				if(row.get(key) == null){
+        					continue;
+        				}
+        				else if(key.equals(COLUMN_POLID)
+        						|| key.equals(COLUMN_SW)
+        						|| key.equals(COLUMN_QUEUE)
+        						|| key.equals(COLUMN_ENQPORT)
+        						|| key.equals(COLUMN_SERVICE)){
+        					continue;
+        				}
+        				else if(key.equals(COLUMN_NAME)){
+        					p.name = (String) row.get(COLUMN_NAME);
+        				}
+        				else if(key.equals(COLUMN_MATCH_ETHDST)){
+        					p.ethdst = (String) row.get(COLUMN_MATCH_ETHDST);
+        				}
+        				else if(key.equals(COLUMN_MATCH_ETHSRC)){
+        					p.ethsrc = (String) row.get(COLUMN_MATCH_ETHSRC);
+        				}
+        				else if(key.equals(COLUMN_MATCH_ETHTYPE)){
+        					p.ethtype = Short.parseShort((String) 
+        							row.get(COLUMN_MATCH_ETHTYPE));
+        				}
+        				else if(key.equals(COLUMN_MATCH_INGRESSPRT)){
+        					p.ingressport = Short.parseShort((String) 
+        							row.get(COLUMN_MATCH_INGRESSPRT));
+        				}
+        				else if(key.equals(COLUMN_MATCH_IPDST)){
+        					p.ipdst = Integer.parseInt((String) 
+        							row.get(COLUMN_MATCH_IPDST));
+        				}
+        				else if(key.equals(COLUMN_MATCH_IPSRC)){
+        					p.ipsrc = Integer.parseInt((String) 
+        							row.get(COLUMN_MATCH_IPSRC));
+        				}
+        				else if(key.equals(COLUMN_MATCH_PROTOCOL)){
+        					p.protocol = Byte.parseByte((String) 
+        							row.get(COLUMN_MATCH_PROTOCOL));
+        				}
+        				else if(key.equals(COLUMN_MATCH_TCPUDP_DSTPRT)){
+        					p.tcpudpdstport = Short.parseShort((String)
+        							row.get(COLUMN_MATCH_TCPUDP_DSTPRT));
+        				}
+        				else if(key.equals(COLUMN_MATCH_TCPUDP_SRCPRT)){
+        					p.tcpudpsrcport = Short.parseShort((String)
+        							row.get(COLUMN_MATCH_TCPUDP_SRCPRT));
+        				}
+        				else if(key.equals(COLUMN_MATCH_VLANID)){
+        					p.vlanid = Short.parseShort((String) 
+        							row.get(COLUMN_MATCH_VLANID));
+        				}
+        				else if(key.equals(COLUMN_NW_TOS)){
+        					p.tos = Byte.parseByte((String) 
+        							row.get(COLUMN_NW_TOS));
+        				}
+        				
+        				else if(key.equals(COLUMN_PRIORITY)){
+        					p.priority = Short.parseShort((String) 
+        							row.get(COLUMN_PRIORITY));
+        				}
+        			}
+        			
+        		}catch(ClassCastException e){
+        			logger.error("Error, Skipping rule, Bad Data "
+        					+ e.getMessage()+" on Rule {}", p.policyid);
+        		} 
+        		//make sure its a queueing rule or service rule only.
+        		if(p.enqueueport != -1 && p.queue != -1 && p.service != null){
+        			l.add(p);
+        		}
+        		else if(p.enqueueport > -1 && p.queue > -1 && p.service == null){
+        			l.add(p);
+        		}
+        		else{
+        			continue;//not a valid rule
+        		}
+        		
+        	}
+        }catch(StorageException e){
+        	logger.error("Error with storage source: {}", e);
+        }
+        Collections.sort(l);
 		return l;
     }
     
@@ -184,14 +299,57 @@ public class QoS implements IQoSService, IFloodlightModule,
      * Reads the types of services from the storage and creates a 
      * sorted ArrayList of QoSTypeOfService from them
      * @return the sorted ArrayList of Type of Service instances (rules from storage)
+     * 
+     *  Based on work from below, Credit to
+     *  @author Amer Tahir
+     *  @edited KC Wang
+     *  @author (re-authored) Ryan Wallner 
      */
     protected ArrayList<QoSTypeOfService> readServicesFromStorage() {
         ArrayList<QoSTypeOfService> l = new ArrayList<QoSTypeOfService>();
-        // *****************************************
-        // *****************************************
-        //TODO 
-        // *****************************************
-        // *****************************************
+        try{
+        	Map<String, Object> row;
+
+        	IResultSet serviceSet = storageSource
+        			.executeQuery(TOS_TABLE_NAME, TOSColumnNames, null, null );
+        	for( Iterator<IResultSet> iter = serviceSet.iterator(); iter.hasNext();){
+        		row = iter.next().getRow();
+        		
+        		QoSTypeOfService s = new QoSTypeOfService();
+        		if(!row.containsKey(COLUMN_SID) 
+        				|| !row.containsKey(COLUMN_TOSBITS)){
+        			logger.error("Skipping entry with required fields {}", row);
+        			continue;
+        		}
+        		try{
+        			s.sid = Integer.parseInt((String) row.get(COLUMN_SID));
+        			s.tos = Byte.parseByte((String) row.get(COLUMN_TOSBITS));
+        			
+        			for(String key: row.keySet()){
+        				if(row.get(key) == null){
+        					continue;
+        				}
+        				else if(key.equals(COLUMN_SID)
+        						|| key.equals(COLUMN_TOSBITS)){
+        					continue;
+        				}
+        				else if(key.equals(COLUMN_SNAME)){
+        					s.name = (String) row.get(COLUMN_SNAME);
+        				}
+        			}
+        			
+        		}catch(ClassCastException e){
+        			logger.error("Error, Skipping rule, Bad Data "
+        					+ e.getMessage()+" on Rule {}", s.sid);
+        		} 
+        		if(s.tos != -1){
+        		l.add(s);
+        		}
+        	}
+        }catch(StorageException e){
+        	logger.error("Error with storage source: {}", e);
+        }
+        Collections.sort(l);
 		return l;
     }
 
@@ -231,6 +389,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	public void startUp(FloodlightModuleContext context) {
 		// initialize REST interface
         restApi.addRestletRoutable(new QoSWebRoutable());
+        floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
         
         //Storage for policies
         storageSource.createTable(TABLE_NAME, null);
@@ -243,41 +402,42 @@ public class QoS implements IQoSService, IFloodlightModule,
         //Storage for services
         storageSource.createTable(TOS_TABLE_NAME, null);
         storageSource.setTablePrimaryKeyName(TOS_TABLE_NAME, COLUMN_SID);
+        //avoid thread issues for concurrency
         synchronized (services) {
             this.services = readServicesFromStorage(); 
             }
         
         // create default "Best Effort" service
         // most networks use this as default, adding here for defaulting
-        QoSTypeOfService service = new QoSTypeOfService();
-        service.name = "Best Effort";
-        service.tos = (byte)0x00;
-        service.sid = service.genID();
-        this.addService(service);
+        try{
+        	QoSTypeOfService service = new QoSTypeOfService();
+        	service.name = "Best Effort";
+        	service.tos = (byte)0x00;
+        	service.sid = service.genID();
+        	this.addService(service);
+        }catch(Exception e){
+        	logger.error("Error adding default Best Effort {}", e);
+        }
 	}
 	
 	@Override
 	public net.floodlightcontroller.core.IListener.Command receive(
 			IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 		
-		// do not process packet if not enabled
+		//do not process packet if not enabled
 		if (!this.enabled) {
 			return Command.CONTINUE;
 		}
+		//logger.debug("Message Recieved: Type - {}",msg.getType().toString());
 		//Listen for Packets that match Policies
 		switch (msg.getType()) {
         case PACKET_IN:
+        	//logger.debug("PACKET_IN recieved");
         	byte[] packetData = OFMessage.getData(sw, msg, cntx);
         	//Temporary match from packet to compare
         	OFMatch tmpMatch = new OFMatch();
         	tmpMatch.loadFromPacket(packetData, OFPort.OFPP_NONE.getValue());
-        	
-        	try{
-        		checkIfQoSApplied(tmpMatch);
-        	}catch(IOException e){
-        		logger.error("Error processing packet, Error: {}", e);
-        	}
-        	
+        	checkIfQoSApplied(tmpMatch);
             break;
         default:
             return Command.CONTINUE;
@@ -327,7 +487,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 * @param QoSTypeOfService
 	 */
 	@Override
-	public void addService(QoSTypeOfService service) {
+	public synchronized void addService(QoSTypeOfService service) {
 		//debug
 		logger.debug("Adding Service to List and Storage");
 		//create the UID
@@ -360,16 +520,19 @@ public class QoS implements IQoSService, IFloodlightModule,
 	
 	/**
 	 * Removes a Network Type of Service
+	 * @category by sid
 	 */
 	@Override
-	public void deleteService(int sid) {
-		/**
-		// TODO called when @DELETE HTTP
-		* gets id from a list of SERVICE in web
-		* remove from list and from storage
-		**/
+	public synchronized void deleteService(int sid) {
+		Iterator<QoSTypeOfService> sIter = this.services.iterator();
+		while(sIter.hasNext()){
+			QoSTypeOfService s = sIter.next();
+			if(s.sid == sid){
+				sIter.remove();
+				break; //done only one can exist
+			}
+		}
 	}
-	
 	
 	/** Adds a policy to all switches
 	 * 	Called when sws = "all"
@@ -377,7 +540,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 *  @overloaded
 	**/
 	@Override
-	public void addPolicy(QoSPolicy policy){
+	public synchronized void addPolicy(QoSPolicy policy){
 		//debug
 		logger.debug("Adding Policy to List and Storage");
 		//create the UID
@@ -394,15 +557,16 @@ public class QoS implements IQoSService, IFloodlightModule,
 			//insertion sort, gets hairy when n # of switches increases. 
 			//larger networks may need a merge sort.
 			if(this.policies.get(p).priority >= policy.priority){
-				//this keeps i to the correct positions to place new policy in
+				//this keeps "p" in the correct position to place new policy in
 				break;
 			}
 		}
 		if (p <= this.policies.size()) {
 			this.policies.add(p, policy);
-			} else {
-				this.policies.add(policy);
-	        }	
+			} 
+		else {
+			this.policies.add(policy);
+			}	
 		//Add to the storageSource
 		Map<String, Object> policyEntry = new HashMap<String, Object>();
 		policyEntry.put(COLUMN_POLID, Long.toString(policy.policyid));
@@ -426,17 +590,15 @@ public class QoS implements IQoSService, IFloodlightModule,
 		storageSource.insertRow(TABLE_NAME, policyEntry);
 		
 		/**
-		* Possibly a place to add a list of switches to add to
+		* TODO Morph this to use a String[] of switches
 		**/
-		
-		//regex for dpid string, this can/needs to be more elegent. Maybe use of a Matcher
-		final String dpidPattern = "^[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]" +
-				":[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]:[\\d|\\D][\\d|\\D]$";
 		
 		if (policy.sw.equals("all")){
 			logger.debug("Adding Policy {} to Entire Network", policy.toString());
 			addPolicyToNetwork(policy);
 		}
+		/** [NOTE] Note utilized yet, future revision used to "save" policies
+		 *  to the controller, then modified to be added to switched **/
 		else if (policy.sw.equals("none")){
 			logger.debug("Adding Policy {} to Controller", policy.toString());
 		}
@@ -447,7 +609,8 @@ public class QoS implements IQoSService, IFloodlightModule,
 			addPolicy(policy, policy.sw);
 			}	
 		else{
-			logger.error("***Policy {} error at switch input {} ***", policy.toString(), policy.sw);
+			logger.error("***Policy {} error at switch input {} ***" +
+					"", policy.toString(), policy.sw);
 		}
 	}
 	
@@ -463,7 +626,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
 		//simple check
 		if(!(switches.isEmpty())){
-			// NEEDS OPTIMIZATION (push to context?)
 			for(IOFSwitch sw : switches.values()){
 				if(!(sw.isConnected())){
 					break;// cannot add
@@ -471,7 +633,10 @@ public class QoS implements IQoSService, IFloodlightModule,
 				//logger.info("Switch : {} DPID : {}",sw.getStringId(), sw.getId());
 				logger.info("Add flow Name: {} Flow: {} Switch "+ sw.getStringId(), 
 				policy.name, flow.toString());
-				flowPusher.addFlow(policy.name, flow, sw.getStringId());	
+				//add unique flow names based on dpid hasCode :)
+				flowPusher.addFlow(policy.name+Integer
+						.toString(sw.getStringId()
+								.hashCode()), flow, sw.getStringId());	
 			}
 		}
 	}
@@ -481,57 +646,96 @@ public class QoS implements IQoSService, IFloodlightModule,
 	 * @param QoSPolicy policy
 	 * @param String sw
 	 */
+										//This will change to list sws[]
+										//of switches, including a single sw
 	@Override
 	public void addPolicy(QoSPolicy policy, String swid) {
+		//get the flowmod
 		OFFlowMod flow = policyToFlowMod(policy);
 		logger.info("Adding policy-flow {} to switch {}",flow.toString(),swid);
-		//add to all switches
-		flowPusher.addFlow(policy.name, flow, swid);
+
+		//add unique flow names based on dpid hasCode :)
+		flowPusher.addFlow(policy.name+Integer
+				.toString(swid.hashCode()), flow, swid);	
 	}
 	
 	/**
-	 * Removes a policiy from entire network
+	 * Removes a policy from entire network
 	 * @param policy
 	 */
 	@Override
-	public void deletePolicyFromNetwork(QoSPolicy policy) {
-	
-	}
+	public void deletePolicyFromNetwork(String policyName) {
+		//all switches
+		Map<Long, IOFSwitch> switches = floodlightProvider.getSwitches();
+		//simple check
+		if(!(switches.isEmpty())){
+			for(IOFSwitch sw : switches.values()){
+				if(!(sw.isConnected())){
+					break;// cannot add
+				}
+				logger.debug("{} has {}",sw.getStringId(),flowPusher.getFlows());
+				flowPusher.deleteFlow(policyName+Integer
+						.toString(sw.getStringId().hashCode()));
+				}
+				//remove from storage
+				//flowPusher.deleteFlow(policyName+Integer.toString(s));
+			}
+		}
 	
 	/** Deletes a policy
+	 *  Called by @DELETE from REST API
 	 *  @author wallnerryan
 	 *  @overloaded
+	 *  @param by policyid
 	**/
 	@Override
-	public void deletePolicy(long policyid){
-		/**
-		//TODO add to all switches in network
-		* get switches in network, each switch add policy
-		* uses deletePolicy*
-		* called by web routable if delete -> all
-		* remove from storage and list
-		* remove the flows that match the policy.name b/c policy.name == flow name
-		*
-		**/
+	public synchronized void deletePolicy(QoSPolicy policy){
+		logger.info("Deleting policy {} attached to switches: {}", policy.name, policy.sw);
 		
-		//from sw get the value "all" or "dpid"
-		//either way removes from list b/c sw policy's have a single flow instance
-		//deletePolicy(id, swid) or deletePolicyFromNetwork
+		//dont have to catch policy.sw == "non" just delete it
+		if(policy.sw.equalsIgnoreCase("none")){logger.info("policy match no switches, removeing from storage");}
+		else if(policy.sw.equalsIgnoreCase("all")){
+			logger.info("Delete flows from network!");
+			deletePolicyFromNetwork(policy.name);
+		}
+		else if(policy.sw.matches(dpidPattern)){
+			deletePolicy(policy.sw, policy.name);
+		}
+		else{
+			logger.error("Error!, Unrecognized switches! Switch is : {}",policy.sw);
+		}
+		
+		//remove from storage
+		Iterator<QoSPolicy> sIter = this.policies.iterator();
+		while(sIter.hasNext()){
+			QoSPolicy p = sIter.next();
+			if(p.policyid == policy.policyid){
+				sIter.remove();
+				break; //done only one can exist
+			}
+		}
 	}
 	
 	/**
 	 * Delete policy from a switch (dpid)
 	 * @param policyid
 	 * @param sw
+	 * @throws  
 	 */
+	                                       //This will change to list sws[]
+										   //of switches, including a single sw
 	@Override
-	public void deletePolicy(int policyid, long swid) {
-		/**
-		// TODO Auto-generated method stub
-		* called by web routable if delete -> sw dpid
-		* removes policy from list and storage
-		* removes all flows that match the policy
-		**/
+	public void deletePolicy(String switches, String policyName){
+		
+		//TODO Morph this to use a String[] of switches
+		IOFSwitch sw = floodlightProvider.getSwitches()
+				.get(HexString.toLong(switches));
+		if(sw != null){
+			assert(sw.isActive());
+		}
+		// delete flow based on hasCode
+		flowPusher.deleteFlow(policyName+sw.getStringId().hashCode());
+		
 	}
 	
 	
@@ -609,7 +813,6 @@ public class QoS implements IQoSService, IFloodlightModule,
 		fm.setType(OFType.FLOW_MOD);
 		//depending on the policy nw_tos or queue the flow mod
 		// will change the type of service bits or enqueue the packets
-		/**TODO**/ 
 		if(policy.queue > -1 && policy.service == null){
 			logger.info("This policy is a queuing policy");
 			List<OFAction> actions = new ArrayList<OFAction>();
@@ -620,7 +823,7 @@ public class QoS implements IQoSService, IFloodlightModule,
 			enqueue.setType(OFActionType.OPAQUE_ENQUEUE); // I think this happens anyway in the constructor
 			enqueue.setPort(policy.enqueueport);
 			enqueue.setQueueId(policy.queue);
-			actions.add((OFAction)enqueue);
+			actions.add((OFAction) enqueue);
 			
 			logger.info("Match is : {}", match.toString());
 			//add the matches and actions and return
@@ -675,20 +878,26 @@ public class QoS implements IQoSService, IFloodlightModule,
 	}
 	
 	/**
-	 * 
+	 * Logs which, if any QoS is applied to PACKET_IN
 	 * @param tmpMatch
 	 * @throws IOException
 	 */
-	private void checkIfQoSApplied(OFMatch tmpMatch) throws IOException {
-		
-		/**
-		 * TODO
-		 * check match strcucture against policies,
-		 * for every policy, you can use policyToFlowMod
-		 * and check match structure against the passed OFMatch
-		 * if they match, log information about what QoS is applied
-		 * to that type of packet.
-		 */
-		
+	private void checkIfQoSApplied(OFMatch tmpMatch){
+		List<QoSPolicy> pols = this.getPolicies();
+		//policies dont apply to wildcards, (yet)
+		if (!pols.isEmpty()){
+			for(QoSPolicy policy : pols){
+				OFMatch m = new OFMatch();
+				m = policyToFlowMod(policy).getMatch();
+				//check
+				if (tmpMatch.equals(m)){
+					logger.info("PACKET_IN matched, Applied QoS Policy {}",policy.toString());
+				}
+				//Commented out checks, annoying in console log. For debug I'll leave though.
+				//else{
+				//	logger.debug("Pass, no match on PACKET_IN");
+				//}
+			}
+		}//else{logger.info("No Policies to Check Against PACKET_IN");}
 	}
 }

@@ -50,9 +50,15 @@ public class QoSTypeOfServiceResource extends ServerResource {
 		IQoSService qos = 
                 (IQoSService)getContext().getAttributes().
                 get(IQoSService.class.getCanonicalName());
-
-		// gets the list of policies currently being implemented
-        return qos.getServices();
+		String status = null;
+		if(qos.isEnabled()){
+			// gets the list of policies currently being implemented
+	        return qos.getServices();
+		}
+		else{
+			status = "Please enable Quality of Service";
+			return ("{\"status\" : \"" + status + "\"}");
+		}
 	}
 	 /**
      *
@@ -118,22 +124,28 @@ public class QoSTypeOfServiceResource extends ServerResource {
     		return "{\"status\" : \"Error! Could not parse Service, see log for details.\"}";
     	}
     	String status = null;
-    	boolean exists = false;
-    	
-    	/**
-    	 * Check if sid is given look for it, 
-    	 * else if not, it is -1 ,
-    	 * use the name of the service to get sid.
-    	 * remove based on sid.
-    	 * exists = true
-    	 * 
-    	 * if Exists
-    	 * 
-    	 * deleteService(sid);
-    	 * status = rule deleted!
-    	 */
-    	
-    	status = "Type Of Service Deleted";
+    	if(qos.isEnabled()){
+    		boolean found = false;
+    		Iterator<QoSTypeOfService> sIter = qos.getServices().iterator();
+    		while(sIter.hasNext()){
+    			QoSTypeOfService s = sIter.next();
+    			if(s.sid == service.sid){
+    				found = true;
+    				break;
+    			}
+    		}
+    		if(!found){
+    			status = "Error! Cannot delete a rule with this ID or NAME, does not exist.";
+    			logger.error(status);
+    		}
+    		else{
+    			qos.deleteService(service.sid);
+    			status = "Type Of Service Service-ID: "+service.sid+" Deleted";
+    			}
+    	}
+    	else{
+    		status = "Please enable QoS";
+    	}
     	return ("{\"status\" : \"" + status + "\"}");
     }
 

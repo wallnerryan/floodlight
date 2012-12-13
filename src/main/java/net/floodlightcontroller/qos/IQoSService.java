@@ -20,7 +20,6 @@ package net.floodlightcontroller.qos;
 **/
 
 import java.util.List;
-
 import net.floodlightcontroller.qos.QoSPolicy;
 import net.floodlightcontroller.core.module.IFloodlightService;
 
@@ -67,28 +66,29 @@ public interface IQoSService extends IFloodlightService {
     public void addPolicyToNetwork(QoSPolicy policy);
     
     /**
-     * 
-     * @param policy
-     */
-    public void deletePolicyFromNetwork(QoSPolicy policy);
-    
-    /**
      * Adds a QoS Policy
      */
     public void addPolicy(QoSPolicy policy, String swid);
 
-    /**
-     * Deletes a QoS Policy
-     */
-    public void deletePolicy(int policyid, long swid);
-    
     /**
      * adds policy to switch
      */
     public void addPolicy(QoSPolicy policy);
     
     /**
-     * deletes policy ffrom switch
+     * 
+     * @param policy from all switches
      */
-    public void deletePolicy(long dpid);
+    public void deletePolicyFromNetwork(String policyName);
+    
+    /**
+     * Deletes a QoS Policy
+     */
+    public void deletePolicy(QoSPolicy policy);
+    
+    /**
+     * deletes policy from switches
+     */
+    public void deletePolicy(String switches, String policyName);
+
 }

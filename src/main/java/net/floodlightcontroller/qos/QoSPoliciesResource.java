@@ -19,8 +19,7 @@ package net.floodlightcontroller.qos;
 *
 * Implementation adopted from Firewall
 * Credit where credit is due:
-* @author Amer Tahir
-* @edited KC Wang
+* Amer Tahir, KC Wang
 *
 **/
 
@@ -50,9 +49,15 @@ public class QoSPoliciesResource extends ServerResource {
 		IQoSService qos = 
                 (IQoSService)getContext().getAttributes().
                 get(IQoSService.class.getCanonicalName());
-
-		// gets the list of policies currently being implemented
-        return qos.getPolicies();
+		String status = null;
+		if(qos.isEnabled()){
+			// gets the list of policies currently being implemented
+	        return qos.getPolicies();
+		}
+		else{
+			status = "Please enable Quality of Service";
+			return ("{\"status\" : \"" + status + "\"}");
+		}
 	}
 	
 	 /**
@@ -87,12 +92,16 @@ public class QoSPoliciesResource extends ServerResource {
     		if(qos.isEnabled()){
     			/**NOTE: the check for how its added happens 
 				 * inside addPolicy:(AROUND QoS.java:467)**/
-    			status = "Adding Policy: " + policy.name;//add service
-    			//basic checks on validity
-    			if(policy.service == null && policy.enqueueport != -1 && policy.queue != -1){
+    			if(policy.name == null){
+    				return status = "Bad Policy, No Name";}
+    			else if(policy.service == null && policy.enqueueport != -1 && policy.queue != -1){
+    				status = "Adding Policy: " + policy.name;//add service
+        			//basic checks on validity
     				qos.addPolicy(policy);
     			}else if(checkIfServiceExists(policy.service, qos.getServices())
     					&& policy.enqueueport == -1 && policy.queue == -1){
+    				status = "Adding Policy: " + policy.name;//add service
+        			//basic checks on validity
     				qos.addPolicy(policy);
     			}else{status = "Service Policy or a Queuing Policy not defined. Check is Service Exists";}
     		}
@@ -110,14 +119,50 @@ public class QoSPoliciesResource extends ServerResource {
      **/
     @Delete
     public String delete(String qosJson) {
+    	IQoSService qos = 
+    			(IQoSService)getContext().getAttributes().
+    			get(IQoSService.class.getCanonicalName());
     	
-    	/**
-    	 * TODO
-    	 */
+    	//dummy service
+    	QoSPolicy policy;
     	
+    	//Accepts just "name": "<Service-Name>"
+    	//or the full service object
+    	try{
+    		policy = jsonToPolicy(qosJson);
+    	}
+    	catch(IOException e){
+    		logger.debug("Error Parsing QoS Policy to JSON: {}, Error: {}", qosJson, e);
+    		e.printStackTrace();
+    		return "{\"status\" : \"Error! Could not parse policy, see log for details.\"}";
+    	}
     	String status = null;
-    	status = "Policy Deleted";
-    	return ("{\"status\" : \"" + status + "\"}");
+    	//Only add if enabled ?needed?
+		if(qos.isEnabled()){
+			boolean found = false;
+			Iterator<QoSPolicy> sIter = qos.getPolicies().iterator();
+			while(sIter.hasNext()){
+				QoSPolicy p = sIter.next();
+				if(p.policyid == policy.policyid){
+					policy = p; //returned the entire policy
+					found = true;
+					break;
+				}
+			}
+	
+			if(!found){
+				status = "Error! Cannot delete a rule with this ID or NAME, does not exist.";
+				logger.error(status);
+			}
+			else{
+				qos.deletePolicy(policy);
+				status = "Type Of Service Service-ID: "+policy.policyid+" Deleted";
+    			}
+		}
+		else{
+			status = "Please enable Quality of Service";
+		}
+		return ("{\"status\" : \"" + status + "\"}");
     }
     
     /**
@@ -166,6 +211,10 @@ public class QoSPoliciesResource extends ServerResource {
     			}
     			//Could use switch if JRE 1.7 compliant
     			//using if else for now
+    			if (tmpS == "policy-id"){
+					policy.policyid = Long.parseLong(jp.getText());
+					//logger.info("[JSON PARSER]Policy Name: {}" , jp.getText());	
+    			}
     			if (tmpS == "name"){
     					policy.name = jp.getText();
     					//logger.info("[JSON PARSER]Policy Name: {}" , jp.getText());	
@@ -232,6 +281,7 @@ public class QoSPoliciesResource extends ServerResource {
     				policy.tcpudpdstport = Short.parseShort(jp.getText());
     				//logger.info("[JSON PARSER]Policy Dst-Port: {}", jp.getText());
     			}		
+    			//TODO morph this to use a String[] of Switches
     			else if(tmpS == "sw"){
     				policy.sw = jp.getText();
     				//logger.info("[JSON PARSER]Policy Switch: {}", jp.getText());	

@@ -48,6 +48,19 @@ parser.add_argument('--src', dest='srcAddress', action='store', default='0.0.0.0
 parser.add_argument('--dst', dest='dstAddress', action='store', default='0.0.0.0', help='destination address: if type=ip, A.B.C.D')
 parser.add_argument('--name', dest='circuitName', action='store', default='circuit-1', help='name for circuit, e.g., circuit-1')
 
+#user catches
+if len(sys.argv) == 1:
+ command = './circuitpusher.py -h'
+ instruct = os.popen(command).read()
+ print instruct
+ exit(1)
+elif sys.argv[1] == "help":
+ command = './circuitpusher.py -h'
+ instruct = os.popen(command).read()
+ print instruct
+ exit(1)
+
+#parse arguments
 args = parser.parse_args()
 print args
 
@@ -126,20 +139,20 @@ if args.action=='add':
             # specified name, and flow type (f: forward, r: reverse, farp/rarp: arp)
 
             command = "curl -s -d '{\"switch\": \"%s\", \"name\":\"%s\", \"src-ip\":\"%s\", \"dst-ip\":\"%s\", \"ether-type\":\"%s\", \"cookie\":\"0\", \"priority\":\"32768\", \"ingress-port\":\"%s\",\"active\":\"true\", \"actions\":\"output=%s\"}' http://%s/wm/staticflowentrypusher/json" % (ap1Dpid, ap1Dpid+"."+args.circuitName+".f", args.srcAddress, args.dstAddress, "0x800", ap1Port, ap2Port, controllerRestIp)
-            result = os.popen(command).read()
+            #result = os.popen(command).read()
             print command
 
             command = "curl -s -d '{\"switch\": \"%s\", \"name\":\"%s\", \"ether-type\":\"%s\", \"cookie\":\"0\", \"priority\":\"32768\", \"ingress-port\":\"%s\",\"active\":\"true\", \"actions\":\"output=%s\"}' http://%s/wm/staticflowentrypusher/json" % (ap1Dpid, ap1Dpid+"."+args.circuitName+".farp", "0x806", ap1Port, ap2Port, controllerRestIp)
-            result = os.popen(command).read()
+           # result = os.popen(command).read()
             print command
 
 
             command = "curl -s -d '{\"switch\": \"%s\", \"name\":\"%s\", \"src-ip\":\"%s\", \"dst-ip\":\"%s\", \"ether-type\":\"%s\", \"cookie\":\"0\", \"priority\":\"32768\", \"ingress-port\":\"%s\",\"active\":\"true\", \"actions\":\"output=%s\"}' http://%s/wm/staticflowentrypusher/json" % (ap1Dpid, ap1Dpid+"."+args.circuitName+".r", args.dstAddress, args.srcAddress, "0x800", ap2Port, ap1Port, controllerRestIp)
-            result = os.popen(command).read()
+           #result = os.popen(command).read()
             print command
 
             command = "curl -s -d '{\"switch\": \"%s\", \"name\":\"%s\", \"ether-type\":\"%s\", \"cookie\":\"0\", \"priority\":\"32768\", \"ingress-port\":\"%s\",\"active\":\"true\", \"actions\":\"output=%s\"}' http://%s/wm/staticflowentrypusher/json" % (ap1Dpid, ap1Dpid+"."+args.circuitName+".rarp", "0x806", ap2Port, ap1Port, controllerRestIp)
-            result = os.popen(command).read()
+            #result = os.popen(command).read()
             print command
             
             # store created circuit attributes in local ./circuits.json
@@ -152,7 +165,7 @@ if args.action=='add':
         # using controller rest API
             
         command="curl -s http://%s/wm/core/switch/all/flow/json| python -mjson.tool" % (controllerRestIp)
-        result = os.popen(command).read()
+        #result = os.popen(command).read()
         print command + "\n" + result
 
 elif args.action=='delete':
@@ -175,19 +188,19 @@ elif args.action=='delete':
             print data, sw
 
             command = "curl -X DELETE -d '{\"name\":\"%s\", \"switch\":\"%s\"}' http://%s/wm/staticflowentrypusher/json" % (sw+"."+args.circuitName+".f", sw, controllerRestIp)
-            result = os.popen(command).read()
+            #result = os.popen(command).read()
             print command, result
 
             command = "curl -X DELETE -d '{\"name\":\"%s\", \"switch\":\"%s\"}' http://%s/wm/staticflowentrypusher/json" % (sw+"."+args.circuitName+".farp", sw, controllerRestIp)
-            result = os.popen(command).read()
+            #result = os.popen(command).read()
             print command, result
 
             command = "curl -X DELETE -d '{\"name\":\"%s\", \"switch\":\"%s\"}' http://%s/wm/staticflowentrypusher/json" % (sw+"."+args.circuitName+".r", sw, controllerRestIp)
-            result = os.popen(command).read()
+            #result = os.popen(command).read()
             print command, result
 
             command = "curl -X DELETE -d '{\"name\":\"%s\", \"switch\":\"%s\"}' http://%s/wm/staticflowentrypusher/json" % (sw+"."+args.circuitName+".rarp", sw, controllerRestIp)
-            result = os.popen(command).read()
+            #result = os.popen(command).read()
             print command, result            
             
         else:

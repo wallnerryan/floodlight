@@ -44,10 +44,7 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
 	public short tcpudpdstport;
 	
 	//Can be "all", "dpid" or [TODO: list of "dpid,dpid"]
-	/**
-	 * TODO
-	 * public String sws;
-	 */
+	//TODO Morph to use a String[] of Switches
 	public String sw;
 	
 	//If it is queuing, must ignore ToS bits. and set "enqueue".
@@ -91,8 +88,8 @@ public class QoSPolicy implements Comparable<QoSPolicy>{
     public int genID() {
         int uid = this.hashCode();
         if (uid < 0) {
-            uid = Math.abs(uid);
             uid = uid * 15551;
+            uid = Math.abs(uid);
         }
         return uid;
     }
